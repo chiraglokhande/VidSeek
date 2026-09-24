@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment & local secrets
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# SQLite / Database
+*.db
+*.sqlite3
+
+# Uploaded and runtime processed media
+uploads/*
+!uploads/.gitkeep
+processed/*
+!processed/.gitkeep
+
+# Test runs & media outputs
+sample_data/test_run/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
