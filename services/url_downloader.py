@@ -164,7 +164,7 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     efficient formats (360p/480p/720p) to keep RAM, disk, and CPU load minimal.
     """
     os.makedirs(output_dir, exist_ok=True)
-    out_template = os.path.join(output_dir, f"{job_id}_%(title).50s.%(ext)s")
+    out_template = os.path.join(output_dir, f"{job_id}_%(id)s.%(ext)s")
     
     # Ensure FFmpeg and Deno are in PATH
     ffmpeg_exe = get_ffmpeg_path()
@@ -242,7 +242,7 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     ydl_opts = {
         'cookiefile': WRITABLE_COOKIES,
         'cachedir': '/tmp/yt-dlp-cache',
-        'format': 'bv*+ba/b',
+        'format': 'bestvideo[height<=720]+bestaudio/best',
         'merge_output_format': 'mp4',
         'noplaylist': True,
         'quiet': False,
@@ -260,8 +260,6 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         'sleep_interval': 2,
         'max_sleep_interval': 5,
     }
-
-
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -281,6 +279,13 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
             else:
                 candidates = [os.path.join(output_dir, f) for f in os.listdir(output_dir) if f.startswith(job_id)]
                 filepath = candidates[0] if candidates else filename
+                
+            if not os.path.exists(filepath):
+                raise RuntimeError(
+                    f"yt-dlp finished but output file was not found. "
+                    f"This usually happens if the video exceeds the 480MB limit. URL: {url}"
+                )
+
     except Exception as e:
         err_msg = str(e)
         if "Sign in to confirm you’re not a bot" in err_msg or "Sign in to confirm you're not a bot" in err_msg:
