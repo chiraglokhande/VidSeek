@@ -6,6 +6,6 @@ scikit-learn>=1.4.0
 python-dotenv>=1.0.0
 requests>=2.31.0
 faster-whisper>=1.0.0
-yt-dlp[default]>=2026.1.0
-yt-dlp-ejs>=0.8.0
+yt-dlp[default]
+yt-dlp-ejs
 gunicorn>=21.2.0
