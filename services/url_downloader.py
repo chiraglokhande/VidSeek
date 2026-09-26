@@ -219,24 +219,10 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     except Exception as e:
         logger.warning(f"Probe extract_info failed: {e}. Falling back to default format selector.")
 
-    # 2. Resilient format selector: bestvideo+bestaudio/best with lightweight stream priority
-    if duration > 10800:
-        format_spec = (
-            'bestvideo[height<=360]+bestaudio/best[height<=360]/'
-            'bestvideo+bestaudio/best/'
-            '18/worst'
-        )
-    else:
-        format_spec = (
-            'bestvideo[height<=720]+bestaudio/best[height<=720]/'
-            'bestvideo[height<=480]+bestaudio/best[height<=480]/'
-            'bestvideo+bestaudio/best/'
-            '18/worst'
-        )
 
     ydl_opts = {
         'ffmpeg_location': ffmpeg_exe,
-        'format': format_spec,
+        'format': 'best',
         'outtmpl': out_template,
         'merge_output_format': 'mp4',
         'progress_hooks': [yt_hook],
@@ -250,6 +236,7 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         'max_sleep_interval': 5,
         **cookie_opts,
     }
+
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
