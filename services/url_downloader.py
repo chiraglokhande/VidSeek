@@ -261,7 +261,8 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            logger.info(f"Downloading video from URL: {url} (cookie_opts: {list(cookie_opts.keys())})")
+            logger.info(f"Downloading video from URL: {url} (cookiefile: {WRITABLE_COOKIES})")
+
             info = ydl.extract_info(url, download=True)
             title = info.get('title', title)
             duration = info.get('duration', duration)
