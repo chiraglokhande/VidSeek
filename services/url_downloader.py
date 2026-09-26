@@ -24,36 +24,43 @@ _USER_AGENT = (
     "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 )
 
-def _get_extractor_args(has_cookies):
+def _get_cookie_file():
     """
-    Select optimal YouTube player clients based on whether cookies are present.
-    If authenticated cookies are available, web client provides high quality and all formats.
-    If unauthenticated, mobile clients (android, ios) bypass cloud IP bot checks.
-    """
-    if has_cookies:
-        return {'youtube': {'player_client': ['web', 'android', 'ios']}}
-    return {'youtube': {'player_client': ['android', 'ios', 'web']}}
-
-
-def _get_cookie_opts():
-    """
-    Build yt-dlp cookie options.
-
+    Finds and returns the path to a valid cookies.txt file.
     Priority:
-      1. YOUTUBE_COOKIES_TEXT or YOUTUBE_COOKIES_BASE64 env var → written to /tmp/youtube_cookies.txt
-         (easiest way to configure on Render/Railway/Fly.io/Vercel dashboards)
-      2. YOUTUBE_COOKIES env var → path to a Netscape-format cookies.txt file
-      3. /etc/secrets/cookies.txt → native Render Secret File location
-      4. Default cookies.txt in the project root
-      5. Browser cookie extraction → tries installed browsers on local machine
-      6. Empty dict → falls back to mobile player clients
+      1. /etc/secrets/cookies.txt (Render native Secret File location)
+      2. YOUTUBE_COOKIES environment variable
+      3. cookies.txt in current directory or project root
+      4. YOUTUBE_COOKIES_TEXT or YOUTUBE_COOKIES_BASE64 written to /tmp/youtube_cookies.txt
     """
-    import shutil
     import base64
 
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # 1. Render native Secret File path
+    render_secret_path = "/etc/secrets/cookies.txt"
+    if os.path.exists(render_secret_path) and os.path.getsize(render_secret_path) > 0:
+        logger.info(f"Using Render Secret File cookies: {render_secret_path}")
+        return render_secret_path
 
-    # 1. Inline cookie content passed via environment variable (ideal for Render dashboard)
+    # 2. Check for a cookies.txt file via YOUTUBE_COOKIES env var
+    cookie_file = os.environ.get("YOUTUBE_COOKIES", "").strip()
+    if cookie_file and os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 0:
+        logger.info(f"Using cookies file from YOUTUBE_COOKIES: {cookie_file}")
+        return cookie_file
+
+    # 3. Check for cookies.txt in project root or current working directory
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    candidates = [
+        "/etc/secrets/cookies.txt",
+        os.path.join(project_root, "cookies.txt"),
+        os.path.abspath("cookies.txt"),
+        "cookies.txt"
+    ]
+    for p in candidates:
+        if os.path.exists(p) and os.path.getsize(p) > 0:
+            logger.info(f"Using cookies file: {p}")
+            return p
+
+    # 4. Inline cookie content passed via environment variable (Render dashboard)
     cookie_text = os.environ.get("YOUTUBE_COOKIES_TEXT", "").strip()
     cookie_b64 = os.environ.get("YOUTUBE_COOKIES_BASE64", "").strip()
     if cookie_b64 and not cookie_text:
@@ -69,30 +76,26 @@ def _get_cookie_opts():
             with open(tmp_cookie_path, "w", encoding="utf-8") as f:
                 f.write(cookie_text)
             logger.info(f"Using cookies generated from environment variable at: {tmp_cookie_path}")
-            return {'cookiefile': tmp_cookie_path}
+            return tmp_cookie_path
         except Exception as e:
             logger.warning(f"Failed to write cookies from env to {tmp_cookie_path}: {e}")
 
-    # 2. Check for a cookies.txt file via YOUTUBE_COOKIES env var (server deployment path)
-    cookie_file = os.environ.get("YOUTUBE_COOKIES", "").strip()
-    if cookie_file and os.path.isfile(cookie_file):
-        logger.info(f"Using cookies file: {cookie_file}")
+    return None
+
+
+def _get_cookie_opts():
+    """
+    Build yt-dlp cookie options.
+    If a cookies.txt file exists (e.g. /etc/secrets/cookies.txt), uses it.
+    Otherwise attempts local browser cookie extraction on dev machines.
+    """
+    import shutil
+
+    cookie_file = _get_cookie_file()
+    if cookie_file:
         return {'cookiefile': cookie_file}
 
-    # 3. Check Render Secret Files default mount path (/etc/secrets/cookies.txt)
-    render_secret_path = "/etc/secrets/cookies.txt"
-    if os.path.isfile(render_secret_path):
-        logger.info(f"Using Render Secret File cookies: {render_secret_path}")
-        return {'cookiefile': render_secret_path}
-
-    # 4. Also check for a default cookies.txt in the project root
-    default_cookie_path = os.path.join(project_root, "cookies.txt")
-    if os.path.isfile(default_cookie_path):
-        logger.info(f"Using default cookies file: {default_cookie_path}")
-        return {'cookiefile': default_cookie_path}
-
-    # 5. Try browser cookie extraction (local dev machines only)
-    #    Map yt-dlp browser names → actual binary names to check
+    # Browser cookie extraction (local dev machines only)
     browser_map = {
         "chrome":   ["google-chrome", "google-chrome-stable", "chrome"],
         "firefox":  ["firefox"],
@@ -111,11 +114,9 @@ def _get_cookie_opts():
         candidates = ["chrome", "firefox", "chromium", "brave", "edge"]
 
     for browser in candidates:
-        # Check if the browser binary is actually installed
         binaries = browser_map.get(browser, [browser])
         found = any(shutil.which(b) for b in binaries)
 
-        # On macOS, browsers live in /Applications, not on PATH
         if not found and platform.system() == "Darwin":
             mac_apps = {
                 "chrome":  "/Applications/Google Chrome.app",
@@ -130,13 +131,11 @@ def _get_cookie_opts():
             continue
 
         try:
-            # Attempt to actually load cookies by extracting info for a known short video
             test_opts = {
                 'quiet': True,
                 'no_warnings': True,
                 'cookiesfrombrowser': (browser,),
                 'skip_download': True,
-                'extractor_args': {'youtube': {'player_client': ['web', 'android']}},
             }
             with yt_dlp.YoutubeDL(test_opts) as ydl:
                 ydl.extract_info("https://www.youtube.com/watch?v=BaW_jenozKc", download=False)
@@ -146,16 +145,15 @@ def _get_cookie_opts():
             logger.debug(f"Browser '{browser}' cookie extraction failed: {e}")
             continue
 
-    logger.warning(
-        "No YouTube cookies available. Relying on mobile player_client extractor args."
-    )
+    logger.warning("No YouTube cookies available. Set /etc/secrets/cookies.txt in Render for best reliability.")
     return {}
+
 
 def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     """
     Downloads video from YouTube, Vimeo, or direct video URL using yt-dlp.
-    Guarantees the downloaded video is strictly under 500 MB and uses low-quality
-    streams (360p/480p) to keep RAM, disk, and CPU load minimal.
+    Guarantees the downloaded video is strictly under 500 MB and uses
+    efficient formats (360p/480p/720p) to keep RAM, disk, and CPU load minimal.
     """
     os.makedirs(output_dir, exist_ok=True)
     out_template = os.path.join(output_dir, f"{job_id}_%(title).50s.%(ext)s")
@@ -183,21 +181,22 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
             speed_mb = round(speed / (1024 * 1024), 1) if speed else 0
             progress_callback(pct, speed_mb)
 
-    # 1. Quick probe of video duration to select optimal low-load format
+    # 1. Quick probe of video duration
     duration = 0
     title = 'Downloaded Lecture'
     cookie_opts = _get_cookie_opts()
-    extractor_args = _get_extractor_args(has_cookies=bool(cookie_opts))
 
     try:
         probe_opts = {
             'quiet': True,
             'no_warnings': True,
             'noplaylist': True,
-            'extractor_args': extractor_args,
             'http_headers': {'User-Agent': _USER_AGENT},
             **cookie_opts,
         }
+        if not cookie_opts:
+            probe_opts['extractor_args'] = {'youtube': {'player_client': ['android', 'ios']}}
+
         with yt_dlp.YoutubeDL(probe_opts) as probe_ydl:
             meta = probe_ydl.extract_info(url, download=False)
             if meta:
@@ -206,21 +205,19 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     except Exception as e:
         logger.warning(f"Probe extract_info failed: {e}. Falling back to default format selector.")
 
-    # 2. Resilient format selector for low quality (<500MB, robust fallbacks)
+    # 2. Resilient format selector: bestvideo+bestaudio/best with lightweight stream priority
     if duration > 10800:
         format_spec = (
-            'b[height<=360][filesize_approx<=400M]/bv*[height<=360]+ba/'
-            'b[height<=360]/'
-            '18/'
-            'worst[ext=mp4]/b/worst'
+            'bestvideo[height<=360]+bestaudio/best[height<=360]/'
+            'bestvideo+bestaudio/best/'
+            '18/worst'
         )
     else:
         format_spec = (
-            'b[height<=480][filesize_approx<=420M]/bv*[height<=480]+ba/'
-            'b[height<=360]/bv*[height<=360]+ba/'
-            'b[height<=720][filesize_approx<=450M]/bv*[height<=720]+ba/'
-            '18/'
-            'worst[ext=mp4]/b/worst'
+            'bestvideo[height<=720]+bestaudio/best[height<=720]/'
+            'bestvideo[height<=480]+bestaudio/best[height<=480]/'
+            'bestvideo+bestaudio/best/'
+            '18/worst'
         )
 
     ydl_opts = {
@@ -233,14 +230,15 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         'no_warnings': True,
         'noplaylist': True,
         'max_filesize': MAX_ALLOWED_SIZE_BYTES,
-        'extractor_args': extractor_args,
         'http_headers': {'User-Agent': _USER_AGENT},
         **cookie_opts,
     }
+    if not cookie_opts:
+        ydl_opts['extractor_args'] = {'youtube': {'player_client': ['android', 'ios']}}
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            logger.info(f"Downloading low-quality video (<500MB) from URL: {url}")
+            logger.info(f"Downloading video from URL: {url} (cookie_opts: {list(cookie_opts.keys())})")
             info = ydl.extract_info(url, download=True)
             title = info.get('title', title)
             duration = info.get('duration', duration)
@@ -260,13 +258,13 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         if "Sign in to confirm you’re not a bot" in err_msg or "Sign in to confirm you're not a bot" in err_msg:
             raise RuntimeError(
                 "YouTube bot detection triggered on server. "
-                "Please configure YouTube cookies on Render by setting the 'YOUTUBE_COOKIES_TEXT' environment variable "
-                "or uploading /etc/secrets/cookies.txt in the Render dashboard."
+                "Please configure YouTube cookies on Render by uploading /etc/secrets/cookies.txt "
+                "or setting the 'YOUTUBE_COOKIES_TEXT' environment variable."
             ) from e
         elif "Requested format is not available" in err_msg:
             raise RuntimeError(
                 "YouTube format extraction failed. Make sure valid YouTube cookies are provided "
-                "in Render environment variables (YOUTUBE_COOKIES_TEXT) or under Secret Files (/etc/secrets/cookies.txt)."
+                "under /etc/secrets/cookies.txt in the Render dashboard."
             ) from e
         raise
 
