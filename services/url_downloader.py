@@ -3,6 +3,8 @@ import sys
 import re
 import json
 import logging
+import shutil
+import tempfile
 import subprocess
 import yt_dlp
 import platform
@@ -26,31 +28,41 @@ _USER_AGENT = (
 
 def _get_cookie_file():
     """
-    Finds and returns the path to a valid cookies.txt file.
+    Finds and returns the path to a writable cookies.txt file.
     Priority:
-      1. /etc/secrets/cookies.txt (Render native Secret File location)
-      2. YOUTUBE_COOKIES environment variable
+      1. /etc/secrets/cookies.txt (Render native Secret File location -> copied to writable /tmp/cookies.txt)
+      2. YOUTUBE_COOKIES environment variable (copied to /tmp/cookies.txt)
       3. cookies.txt in current directory or project root
-      4. YOUTUBE_COOKIES_TEXT or YOUTUBE_COOKIES_BASE64 written to /tmp/youtube_cookies.txt
+      4. YOUTUBE_COOKIES_TEXT or YOUTUBE_COOKIES_BASE64 written to /tmp/cookies.txt
     """
     import base64
 
-    # 1. Render native Secret File path
+    writable_cookie = "/tmp/cookies.txt" if os.path.exists("/tmp") else os.path.join(tempfile.gettempdir(), "cookies.txt")
+
+    # 1. Render native Secret File path (Render mounts /etc/secrets as read-only, copy to /tmp)
     render_secret_path = "/etc/secrets/cookies.txt"
     if os.path.exists(render_secret_path) and os.path.getsize(render_secret_path) > 0:
-        logger.info(f"Using Render Secret File cookies: {render_secret_path}")
-        return render_secret_path
+        try:
+            shutil.copyfile(render_secret_path, writable_cookie)
+            logger.info(f"Copied read-only Render secret {render_secret_path} -> writable {writable_cookie}")
+            return writable_cookie
+        except Exception as e:
+            logger.warning(f"Could not copy {render_secret_path} to {writable_cookie}: {e}")
+            return render_secret_path
 
     # 2. Check for a cookies.txt file via YOUTUBE_COOKIES env var
     cookie_file = os.environ.get("YOUTUBE_COOKIES", "").strip()
     if cookie_file and os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 0:
-        logger.info(f"Using cookies file from YOUTUBE_COOKIES: {cookie_file}")
-        return cookie_file
+        try:
+            shutil.copyfile(cookie_file, writable_cookie)
+            logger.info(f"Copied {cookie_file} -> writable {writable_cookie}")
+            return writable_cookie
+        except Exception:
+            return cookie_file
 
     # 3. Check for cookies.txt in project root or current working directory
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     candidates = [
-        "/etc/secrets/cookies.txt",
         os.path.join(project_root, "cookies.txt"),
         os.path.abspath("cookies.txt"),
         "cookies.txt"
@@ -70,15 +82,13 @@ def _get_cookie_file():
             logger.warning(f"Failed to decode YOUTUBE_COOKIES_BASE64: {e}")
 
     if cookie_text:
-        tmp_dir = "/tmp" if os.path.exists("/tmp") else project_root
-        tmp_cookie_path = os.path.join(tmp_dir, "youtube_cookies.txt")
         try:
-            with open(tmp_cookie_path, "w", encoding="utf-8") as f:
+            with open(writable_cookie, "w", encoding="utf-8") as f:
                 f.write(cookie_text)
-            logger.info(f"Using cookies generated from environment variable at: {tmp_cookie_path}")
-            return tmp_cookie_path
+            logger.info(f"Using cookies generated from environment variable at: {writable_cookie}")
+            return writable_cookie
         except Exception as e:
-            logger.warning(f"Failed to write cookies from env to {tmp_cookie_path}: {e}")
+            logger.warning(f"Failed to write cookies from env to {writable_cookie}: {e}")
 
     return None
 
@@ -86,11 +96,9 @@ def _get_cookie_file():
 def _get_cookie_opts():
     """
     Build yt-dlp cookie options.
-    If a cookies.txt file exists (e.g. /etc/secrets/cookies.txt), uses it.
+    If a cookies.txt file exists (e.g. /etc/secrets/cookies.txt -> /tmp/cookies.txt), uses it.
     Otherwise attempts local browser cookie extraction on dev machines.
     """
-    import shutil
-
     cookie_file = _get_cookie_file()
     if cookie_file:
         return {'cookiefile': cookie_file}
