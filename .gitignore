@@ -53,3 +53,6 @@ sample_data/test_run/
 .vscode/
 *.swp
 *.swo
+
+# YouTube cookies (sensitive auth tokens — never commit)
+cookies.txt

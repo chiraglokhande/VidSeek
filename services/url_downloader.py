@@ -27,36 +27,89 @@ _USER_AGENT = (
 
 def _get_cookie_opts():
     """
-    Build yt-dlp cookie options by trying each browser in order.
-    Returns a dict with 'cookiesfrombrowser' key if a working browser is found,
-    otherwise returns an empty dict (no cookies).
-    """
-    # Determine browser candidates based on OS
-    if platform.system() == "Darwin":  # macOS
-        browsers = ["chrome", "firefox", "safari", "edge", "brave"]
-    elif platform.system() == "Windows":
-        browsers = ["chrome", "firefox", "edge", "brave", "opera"]
-    else:  # Linux
-        browsers = ["firefox", "chrome", "chromium", "brave", "edge"]
+    Build yt-dlp cookie options.
 
-    for browser in browsers:
+    Priority:
+      1. YOUTUBE_COOKIES env var → path to a Netscape-format cookies.txt file
+         (ideal for headless servers like Render, Railway, Fly.io)
+      2. Browser cookie extraction → tries installed browsers on the local machine
+         (works on dev machines where the user is logged into YouTube)
+      3. Empty dict → no cookies (direct URLs, Vimeo, etc. still work)
+    """
+    import shutil
+
+    # 1. Check for a cookies.txt file (server deployment path)
+    cookie_file = os.environ.get("YOUTUBE_COOKIES", "").strip()
+    if cookie_file and os.path.isfile(cookie_file):
+        logger.info(f"Using cookies file: {cookie_file}")
+        return {'cookiefile': cookie_file}
+
+    # Also check for a default cookies.txt in the project root
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    default_cookie_path = os.path.join(project_root, "cookies.txt")
+    if os.path.isfile(default_cookie_path):
+        logger.info(f"Using default cookies file: {default_cookie_path}")
+        return {'cookiefile': default_cookie_path}
+
+    # 2. Try browser cookie extraction (local dev machines only)
+    #    Map yt-dlp browser names → actual binary names to check
+    browser_map = {
+        "chrome":   ["google-chrome", "google-chrome-stable", "chrome"],
+        "firefox":  ["firefox"],
+        "safari":   ["safari"],            # macOS only
+        "edge":     ["microsoft-edge", "msedge"],
+        "brave":    ["brave-browser", "brave"],
+        "chromium": ["chromium", "chromium-browser"],
+        "opera":    ["opera"],
+    }
+
+    if platform.system() == "Darwin":
+        candidates = ["chrome", "firefox", "safari", "edge", "brave"]
+    elif platform.system() == "Windows":
+        candidates = ["chrome", "firefox", "edge", "brave", "opera"]
+    else:
+        candidates = ["chrome", "firefox", "chromium", "brave", "edge"]
+
+    for browser in candidates:
+        # Check if the browser binary is actually installed
+        binaries = browser_map.get(browser, [browser])
+        found = any(shutil.which(b) for b in binaries)
+
+        # On macOS, browsers live in /Applications, not on PATH
+        if not found and platform.system() == "Darwin":
+            mac_apps = {
+                "chrome":  "/Applications/Google Chrome.app",
+                "firefox": "/Applications/Firefox.app",
+                "safari":  "/Applications/Safari.app",
+                "edge":    "/Applications/Microsoft Edge.app",
+                "brave":   "/Applications/Brave Browser.app",
+            }
+            found = os.path.isdir(mac_apps.get(browser, ""))
+
+        if not found:
+            continue
+
         try:
-            # Quick probe to test if cookies can be extracted from this browser
+            # Attempt to actually load cookies by extracting info for a known short video
             test_opts = {
                 'quiet': True,
                 'no_warnings': True,
                 'cookiesfrombrowser': (browser,),
-                'extract_flat': True,
+                'skip_download': True,
             }
             with yt_dlp.YoutubeDL(test_opts) as ydl:
-                # Just instantiate — if browser cookies aren't available it will throw
-                pass
+                ydl.extract_info("https://www.youtube.com/watch?v=BaW_jenozKc", download=False)
             logger.info(f"Using cookies from browser: {browser}")
             return {'cookiesfrombrowser': (browser,)}
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Browser '{browser}' cookie extraction failed: {e}")
             continue
 
-    logger.warning("No browser cookies available. YouTube may block the download.")
+    logger.warning(
+        "No YouTube cookies available. YouTube may block downloads. "
+        "Set YOUTUBE_COOKIES env var to a cookies.txt file path, or "
+        "place a cookies.txt in the project root for server deployments."
+    )
     return {}
 
 def download_video_from_url(url, output_dir, job_id, progress_callback=None):
