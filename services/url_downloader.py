@@ -189,17 +189,27 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
             speed_mb = round(speed / (1024 * 1024), 1) if speed else 0
             progress_callback(pct, speed_mb)
 
-    # 1. Verify cookies file exists
-    COOKIES_FILE = "/etc/secrets/cookies.txt"
-    if not os.path.exists(COOKIES_FILE):
-        # Fallback: try dynamic cookie resolution
-        COOKIES_FILE = _get_cookie_file()
-        if not COOKIES_FILE:
+    # 1. Verify cookies file and copy to writable /tmp location
+    # Render mounts /etc/secrets/* as READ-ONLY — yt-dlp must not write back to it
+    SOURCE_COOKIES = "/etc/secrets/cookies.txt"
+    WRITABLE_COOKIES = "/tmp/vidseek_cookies.txt"
+
+    if os.path.exists(SOURCE_COOKIES):
+        shutil.copyfile(SOURCE_COOKIES, WRITABLE_COOKIES)
+        logger.info("Copied Render secret cookies -> %s", WRITABLE_COOKIES)
+    else:
+        # Fallback: try dynamic cookie resolution (local dev / env var)
+        fallback = _get_cookie_file()
+        if fallback:
+            shutil.copyfile(fallback, WRITABLE_COOKIES)
+            logger.info("Copied fallback cookies %s -> %s", fallback, WRITABLE_COOKIES)
+        else:
             raise RuntimeError(
                 "YouTube cookies file not found at /etc/secrets/cookies.txt. "
                 "Please add it as a Secret File in your Render dashboard."
             )
-    logger.info("YouTube cookies found at: %s", COOKIES_FILE)
+
+    logger.info("YouTube cookies ready at: %s", WRITABLE_COOKIES)
 
     # Extended player client list — tv_embedded bypasses consent/reload gate on server IPs
     _EXTRACTOR_ARGS = {
@@ -216,7 +226,8 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
             'quiet': True,
             'no_warnings': True,
             'noplaylist': True,
-            'cookiefile': COOKIES_FILE,
+            'cookiefile': WRITABLE_COOKIES,
+            'cachedir': '/tmp/yt-dlp-cache',
             'http_headers': {'User-Agent': _USER_AGENT},
             'extractor_args': _EXTRACTOR_ARGS,
         }
@@ -229,7 +240,8 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         logger.warning(f"Probe extract_info failed: {e}. Proceeding with download anyway.")
 
     ydl_opts = {
-        'cookiefile': COOKIES_FILE,
+        'cookiefile': WRITABLE_COOKIES,
+        'cachedir': '/tmp/yt-dlp-cache',
         'format': 'bestvideo*+bestaudio/best',
         'merge_output_format': 'mp4',
         'noplaylist': True,
