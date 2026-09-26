@@ -13,7 +13,7 @@ import logging
 logger = logging.getLogger("vidseek.learning_db")
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "learning.db")
+DB_PATH = os.path.join("/tmp" if os.environ.get("VERCEL") else BASE_DIR, "learning.db")
 
 
 def get_db_connection():

@@ -47,8 +47,12 @@ app = Flask(__name__, static_folder="static", template_folder="templates")
 CORS(app)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
-PROCESSED_DIR = os.path.join(BASE_DIR, "processed")
+if os.environ.get("VERCEL"):
+    UPLOAD_DIR = "/tmp/uploads"
+    PROCESSED_DIR = "/tmp/processed"
+else:
+    UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+    PROCESSED_DIR = os.path.join(BASE_DIR, "processed")
 SAMPLE_DIR = os.path.join(BASE_DIR, "sample_data")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)

@@ -1,0 +1,35 @@
+# Vercel Deployment Ignore File
+# Prevents non-essential and local data from bloating the serverless function bundle
+
+# Test & sample media files
+sample_data/
+tests/
+
+# Databases
+*.db
+*.sqlite3
+learning.db
+
+# Python & Virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+.pytest_cache/
+
+# Runtime media directories (uploaded & processed)
+uploads/*
+!uploads/.gitkeep
+processed/*
+!processed/.gitkeep
+
+# Environment & local secrets
+.env
+.env.*
+.DS_Store
+
+# Git
+.git/
+.github/
