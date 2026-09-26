@@ -159,7 +159,6 @@ def _get_cookie_opts():
 
 def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     os.makedirs(output_dir, exist_ok=True)
-
     output_template = os.path.join(
         output_dir,
         f"{job_id}.%(ext)s"
@@ -172,106 +171,104 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     print("OUTPUT TEMPLATE:", output_template)
     print("=" * 70)
 
+    # ---------------------------------------------------------
+    # Cookie setup
+    # ---------------------------------------------------------
+    cookie_file = None
+    render_cookie = "/etc/secrets/cookies.txt"
+    if os.path.exists(render_cookie):
+        try:
+            cookie_file = "/tmp/vidseek_cookies.txt"
+            import shutil
+            shutil.copyfile(render_cookie, cookie_file)
+            print("Using Render YouTube cookies")
+        except Exception as e:
+            print(f"Cookie copy failed: {e}")
+
+    # ---------------------------------------------------------
+    # yt-dlp options
+    # ---------------------------------------------------------
     ydl_opts = {
         "outtmpl": output_template,
-
-        # robust fallback format: prefer mp4, allow merging if no single file is available
-        "format": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]",
+        
+        # Keep the download reasonably small for Render.
+        "format": (
+            "bestvideo[height<=480]+bestaudio/"
+            "best[height<=480]/"
+            "best"
+        ),
         "merge_output_format": "mp4",
 
         "noplaylist": True,
 
         "quiet": False,
         "no_warnings": False,
+        "verbose": True,
 
-        "retries": 3,
-        "fragment_retries": 3,
+        "retries": 5,
+        "fragment_retries": 5,
 
         "continuedl": True,
-
-        # Don't abort because of your application's size assumption.
-        "nopart": False,
         
-        # Keep our cookie configuration to avoid bot blocks
-        "cookiefile": "/tmp/vidseek_cookies.txt" if os.path.exists("/tmp/vidseek_cookies.txt") else None,
         "cachedir": "/tmp/yt-dlp-cache",
-        "http_headers": {'User-Agent': _USER_AGENT},
+        "http_headers": {
+            "User-Agent": _USER_AGENT
+        },
         "ffmpeg_location": get_ffmpeg_path(),
     }
 
-    # Fetch cookies to writable tmp
-    if os.path.exists("/etc/secrets/cookies.txt"):
-        shutil.copyfile("/etc/secrets/cookies.txt", "/tmp/vidseek_cookies.txt")
-        ydl_opts["cookiefile"] = "/tmp/vidseek_cookies.txt"
+    if cookie_file and os.path.exists(cookie_file):
+        ydl_opts["cookiefile"] = cookie_file
 
-    # Try clients from least complicated to more restricted.
-    clients = [
-        "web_embedded",
-        "tv_embedded",
-        "android_vr",
-        "ios",
-        "web",
-    ]
-
-    errors = []
+    # ---------------------------------------------------------
+    # Download
+    # ---------------------------------------------------------
     title = "Video"
     duration = 0
-    info_extracted = False
 
-    for client in clients:
-        ydl_opts["extractor_args"] = {
-            "youtube": {
-                "player_client": [client]
-            }
-        }
-        
-        print(f"\n--- Trying YouTube client: {client} ---")
-        
-        # Clean up any partial files from previous attempts
-        import glob
-        for f in glob.glob(os.path.join(output_dir, f"{job_id}.*")):
-            try:
-                os.remove(f)
-            except OSError:
-                pass
-                
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                
-                title = info.get("title", title)
-                duration = info.get("duration", duration)
+    try:
+        print("\nStarting yt-dlp...")
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(
+                url,
+                download=True
+            )
 
-                print("\nYT-DLP INFO")
-                print("ID:", info.get("id"))
-                print("TITLE:", title)
-                print("EXT:", info.get("ext"))
-                print("FORMAT:", info.get("format"))
-                print("SIZE:", info.get("filesize"))
-                print("REQUESTED DOWNLOADS:", info.get("requested_downloads"))
-                
-                info_extracted = True
-                break # Success! Break out of the fallback loop
+            title = info.get("title", "Video")
+            duration = info.get("duration") or 0
 
-        except Exception as e:
-            err_msg = str(e)
-            print(f"Client {client} failed: {err_msg}")
-            errors.append(f"{client}: {err_msg}")
-            
-    if not info_extracted:
-        print("\nYT-DLP EXCEPTION: All clients failed")
+            print("\nYT-DLP INFO")
+            print("ID:", info.get("id"))
+            print("TITLE:", title)
+            print("EXT:", info.get("ext"))
+            print("FORMAT:", info.get("format"))
+            print("DURATION:", duration)
+            print("SIZE:", info.get("filesize"))
+            print(
+                "REQUESTED DOWNLOADS:",
+                info.get("requested_downloads")
+            )
+
+    except Exception as e:
+        print("\nYT-DLP DOWNLOAD FAILED")
+        print(repr(e))
         raise RuntimeError(
-            "Unable to download YouTube video. Bot detection may be blocking the server.\n" + 
-            "\n".join(errors)
-        )
+            f"yt-dlp download failed: {e}"
+        ) from e
 
+    # ---------------------------------------------------------
+    # Locate downloaded file
+    # ---------------------------------------------------------
     print("\nFILES AFTER DOWNLOAD:")
 
     all_files = []
 
     for root, dirs, files in os.walk(output_dir):
         for filename in files:
-            full_path = os.path.join(root, filename)
+            full_path = os.path.join(
+                root,
+                filename
+            )
 
             try:
                 size = os.path.getsize(full_path)
@@ -285,39 +282,67 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
 
             all_files.append(full_path)
 
-    print("=" * 70)
+    # ---------------------------------------------------------
+    # Filter media files
+    # ---------------------------------------------------------
+    media_extensions = (
+        ".mp4",
+        ".webm",
+        ".mkv",
+        ".mov",
+        ".m4v",
+        ".avi"
+    )
 
-    # Ignore temporary files
-    import glob
     media_files = [
         f for f in all_files
-        if not f.endswith(".part")
-        and not f.endswith(".ytdl")
-        and not f.endswith(".json")
-        and os.path.basename(f).startswith(job_id)
+        if (
+            os.path.isfile(f)
+            and os.path.basename(f).startswith(job_id)
+            and f.lower().endswith(media_extensions)
+            and not f.endswith(".part")
+        )
     ]
 
     if not media_files:
+        print("\nNO MEDIA FILE FOUND")
         raise RuntimeError(
-            "yt-dlp completed, but no final media file exists. "
-            "Check the Render logs above for the actual yt-dlp output."
+            "yt-dlp completed but no downloaded video file was found. "
+            "Check the yt-dlp logs above."
         )
 
+    # ---------------------------------------------------------
+    # Select largest media file
+    # ---------------------------------------------------------
     downloaded_file = max(
         media_files,
         key=os.path.getsize
     )
 
-    size_mb = os.path.getsize(downloaded_file) / (1024 * 1024)
-    print("SELECTED FILE:", downloaded_file)
-    print(f"Final file size: {size_mb:.2f} MB")
-    
-    if size_mb > 480:
+    size_mb = (
+        os.path.getsize(downloaded_file)
+        / (1024 * 1024)
+    )
+
+    print("\nSELECTED FILE:")
+    print(downloaded_file)
+    print(
+        f"FINAL FILE SIZE: {size_mb:.2f} MB"
+    )
+
+    # ---------------------------------------------------------
+    # 480 MB protection
+    # ---------------------------------------------------------
+    if os.path.getsize(downloaded_file) > MAX_ALLOWED_SIZE_BYTES:
         os.remove(downloaded_file)
         raise RuntimeError(
             f"Downloaded video is {size_mb:.1f} MB, "
             "which exceeds the 480 MB limit."
         )
+
+    print("=" * 70)
+    print("YT-DLP DOWNLOAD SUCCESS")
+    print("=" * 70)
 
     return {
         "title": title,
