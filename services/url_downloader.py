@@ -5,6 +5,7 @@ import json
 import logging
 import subprocess
 import yt_dlp
+import platform
 
 # Ensure root directory is on sys.path if run directly as a script
 if __package__ is None or __package__ == "":
@@ -16,6 +17,47 @@ logger = logging.getLogger(__name__)
 
 # Strict limit to guarantee video stays under 500 MB (target ~50MB to 350MB for low system load)
 MAX_ALLOWED_SIZE_BYTES = 480 * 1024 * 1024
+
+# Realistic User-Agent to avoid YouTube bot detection
+_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+)
+
+
+def _get_cookie_opts():
+    """
+    Build yt-dlp cookie options by trying each browser in order.
+    Returns a dict with 'cookiesfrombrowser' key if a working browser is found,
+    otherwise returns an empty dict (no cookies).
+    """
+    # Determine browser candidates based on OS
+    if platform.system() == "Darwin":  # macOS
+        browsers = ["chrome", "firefox", "safari", "edge", "brave"]
+    elif platform.system() == "Windows":
+        browsers = ["chrome", "firefox", "edge", "brave", "opera"]
+    else:  # Linux
+        browsers = ["firefox", "chrome", "chromium", "brave", "edge"]
+
+    for browser in browsers:
+        try:
+            # Quick probe to test if cookies can be extracted from this browser
+            test_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'cookiesfrombrowser': (browser,),
+                'extract_flat': True,
+            }
+            with yt_dlp.YoutubeDL(test_opts) as ydl:
+                # Just instantiate — if browser cookies aren't available it will throw
+                pass
+            logger.info(f"Using cookies from browser: {browser}")
+            return {'cookiesfrombrowser': (browser,)}
+        except Exception:
+            continue
+
+    logger.warning("No browser cookies available. YouTube may block the download.")
+    return {}
 
 def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     """
@@ -44,8 +86,16 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     # 1. Quick probe of video duration to select optimal low-load format
     duration = 0
     title = 'Downloaded Lecture'
+    cookie_opts = _get_cookie_opts()
     try:
-        with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True, 'noplaylist': True}) as probe_ydl:
+        probe_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'noplaylist': True,
+            'http_headers': {'User-Agent': _USER_AGENT},
+            **cookie_opts,
+        }
+        with yt_dlp.YoutubeDL(probe_opts) as probe_ydl:
             meta = probe_ydl.extract_info(url, download=False)
             if meta:
                 duration = meta.get('duration', 0) or 0
@@ -82,6 +132,8 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         'no_warnings': True,
         'noplaylist': True,
         'max_filesize': MAX_ALLOWED_SIZE_BYTES,
+        'http_headers': {'User-Agent': _USER_AGENT},
+        **cookie_opts,
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
