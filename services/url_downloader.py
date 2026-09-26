@@ -175,8 +175,9 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     ydl_opts = {
         "outtmpl": output_template,
 
-        # Start simple: don't force video+audio merging yet.
-        "format": "best[height<=480]/best",
+        # robust fallback format: prefer mp4, allow merging if no single file is available
+        "format": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]",
+        "merge_output_format": "mp4",
 
         "noplaylist": True,
 
@@ -195,6 +196,7 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         "cookiefile": "/tmp/vidseek_cookies.txt" if os.path.exists("/tmp/vidseek_cookies.txt") else None,
         "cachedir": "/tmp/yt-dlp-cache",
         "http_headers": {'User-Agent': _USER_AGENT},
+        "ffmpeg_location": get_ffmpeg_path(),
     }
 
     # Fetch cookies to writable tmp
