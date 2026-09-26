@@ -1,85 +1,95 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark-neutral-theme">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VidSeek AI — Intelligent Video Search, Topic Detection & Video Segmentation</title>
-  <meta name="description" content="AI-powered lecture understanding platform: automatic topic boundary detection, video chapter segmentation, intelligent timestamp search, and Q&A.">
+  <title>VidSeek Command — Drive Video Knowledge End to End with AI</title>
+  <meta name="description" content="VidSeek Command is AI built directly into your lecture workspace that executes video work for you. Transcribe, auto-divide chapters, pinpoint timestamps, and generate study quizzes — just by saying what you need.">
+
+  <!-- Preload Mercury Command Fonts -->
+  <link rel="preload" href="/static/fonts/66786c931e084141-s.p.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/92d547acff458051-s.p.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/b8e7c140d2eeafb4-s.p.woff2" as="font" type="font/woff2" crossorigin>
+
+  <!-- Google Fonts Fallback -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="/static/css/mercury-bundle.css">
+  <link rel="stylesheet" href="/static/css/mercury-custom.css">
   <link rel="stylesheet" href="/static/css/style.css">
+
   <script>
     (function() {
       try {
         const saved = localStorage.getItem('vidseek-theme');
-        const theme = saved ? saved : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        const theme = saved ? saved : 'dark';
         document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.setAttribute('data-global-theme', 'dark-neutral-theme');
       } catch(e) {}
     })();
   </script>
 </head>
-<body>
-  <!-- Background ambient glow -->
+<body class="bg-background-default dark-neutral-theme text-text-default" data-global-theme="dark-neutral-theme" data-current-theme="dark-neutral-theme">
+
+  <!-- Ambient Mercury dark glows -->
   <div class="glow-sphere glow-1"></div>
   <div class="glow-sphere glow-2"></div>
   <div class="glow-sphere glow-3"></div>
 
-  <!-- Header -->
-  <header class="navbar">
+  <!-- Fullscreen Animated Light Theme Ambient Aurora Canvas & Waves (Active on complete screen) -->
+  <div class="fullscreen-light-ambient" id="fullscreen-light-ambient" aria-hidden="true">
+    <div class="light-aurora-glow light-aurora-1"></div>
+    <div class="light-aurora-glow light-aurora-2"></div>
+    <div class="light-aurora-glow light-aurora-3"></div>
+    <div class="light-aurora-glow light-aurora-4"></div>
+    <div class="light-aurora-flow"></div>
+  </div>
+
+  <!-- Persistent Fullscreen WebGL Particle Ripple Canvas (Active across Home, History, Analytics, About) -->
+  <div class="mercury-global-canvas-wrap" data-hero-canvas-wrap id="mercury-global-canvas-wrap">
+    <canvas id="mercury-hero-canvas" class="mercury-hero-canvas"></canvas>
+  </div>
+
+  <!-- Header / Navigation Bar (Rebound Capsule Design) -->
+  <header class="navbar sticky top-0 z-navbar-z-index">
     <div class="nav-container">
-      <div class="logo-group">
-        <div class="logo-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+      <div class="logo-group" onclick="navigateTo('home')" style="cursor: pointer;">
+        <div class="logo-icon-mark">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2C6.477 2 2 6.477 2 12c0 3.06 1.38 5.8 3.56 7.64L6.5 18A8 8 0 1 1 20 12c0 2.21-.9 4.21-2.35 5.65l-1.06-1.06A6.5 6.5 0 1 0 12 5.5v2.5l4-3.5L12 1v1z"/>
           </svg>
         </div>
         <div class="logo-text">
-          <span class="brand-title">VidSeek<span class="brand-ai">AI</span></span>
-          <span class="brand-tag">Intelligent Video Segmentation</span>
+          <span class="brand-title">VidSeek</span>
         </div>
       </div>
 
-      <!-- Main Navigation Menu: Home, History, About -->
-      <nav class="nav-menu" aria-label="Main Navigation">
+      <!-- Center Floating Pill Menu: Home, History, Analytics, About -->
+      <nav class="nav-menu rebound-pill-nav" aria-label="Main Navigation">
         <button class="nav-link-btn active" data-page="home" id="nav-btn-home" title="Home: Upload & Analysis">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-            <polyline points="9 22 9 12 15 12 15 22"></polyline>
-          </svg>
           <span>Home</span>
         </button>
         <button class="nav-link-btn" data-page="history" id="nav-btn-history" title="History: Processed Videos & Search Library">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="12 6 12 12 16 14"></polyline>
-          </svg>
           <span>History</span>
           <span class="nav-counter-badge" id="history-count-badge">0</span>
         </button>
         <button class="nav-link-btn" data-page="analytics" id="nav-btn-analytics" title="Analytics: Learning Activity & Progress">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="20" x2="18" y2="10"></line>
-            <line x1="12" y1="20" x2="12" y2="4"></line>
-            <line x1="6" y1="20" x2="6" y2="14"></line>
-          </svg>
           <span>Analytics</span>
         </button>
         <button class="nav-link-btn" data-page="about" id="nav-btn-about" title="About: How to Use & Architecture">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="16" x2="12" y2="12"></line>
-            <line x1="12" y1="8" x2="12.01" y2="8"></line>
-          </svg>
-          <span>About &amp; Guide</span>
+          <span>About</span>
         </button>
       </nav>
 
+      <!-- Right Nav Actions: Theme Toggle, Clear Storage & Primary CTA Pill -->
       <div class="nav-actions">
         <!-- Light / Dark Mode Toggle Button -->
-        <button id="btn-theme-toggle" class="btn btn-secondary theme-toggle-btn" title="Toggle Light / Dark Mode" aria-label="Toggle theme">
+        <button id="btn-theme-toggle" class="btn theme-toggle-btn rebound-icon-btn" title="Toggle Light / Dark Mode" aria-label="Toggle theme">
           <span class="theme-icon sun-icon">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="5"></circle>
               <line x1="12" y1="1" x2="12" y2="3"></line>
               <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -92,477 +102,720 @@
             </svg>
           </span>
           <span class="theme-icon moon-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
             </svg>
           </span>
-          <span class="theme-label" id="theme-label">Light</span>
+          <span class="theme-label" id="theme-label" style="display:none;">Light</span>
         </button>
 
-        <button id="btn-clear-storage" class="btn btn-secondary btn-clear-danger" title="Delete stored videos and free server memory">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <!-- Explicit Clear History Capsule Button -->
+        <button id="btn-clear-storage" class="rebound-clear-btn" title="Clear downloaded videos, processed history, and storage cache">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="3 6 5 6 21 6"></polyline>
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
           </svg>
-          Clear Storage
+          <span>Clear History</span>
         </button>
-        <button id="btn-new-upload" class="btn btn-primary">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-          Upload Video
+
+        <!-- Rebound Style Standalone Capsule Button ("Get Yours" style) -->
+        <button id="btn-new-upload" class="rebound-cta-pill" title="Upload Video">
+          <span>Upload Video</span>
         </button>
       </div>
     </div>
   </header>
 
   <main class="main-content">
-    <!-- Page 1: Home Page (Upload & Video Analysis Dashboard) -->
+    <!-- PAGE 1: COMMAND HOME (Hero, Command Bar, Showcase, Marquee, Theater) -->
     <div id="page-home" class="page-view active">
-      <!-- Hero / Upload Section -->
-      <section id="upload-section" class="upload-hero">
-      <div class="hero-header">
-        <div class="badge-pill">
-          <span class="pulse-dot"></span>
-          Whisper AI • FFmpeg Slicing • NLP Topic Segmentation
-        </div>
-        <h1 class="hero-title">Upload 1 Long Video <span class="gradient-text">➔ Auto-Divide</span> into Topic-wise Mini Videos</h1>
-        <p class="hero-desc">
-          VidSeek AI automatically extracts audio, transcribes lectures with Whisper, discovers topic boundaries without manual tags, slices individual chapter videos with FFmpeg, and enables instant semantic search and Q&A.
-        </p>
-      </div>
 
-      <!-- Direct Video Link Card -->
-      <div class="url-input-card">
-        <div class="url-input-inner">
-          <div class="url-icon-wrap">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-            </svg>
-          </div>
-          <input type="url" id="video-url-input" placeholder="Paste YouTube link or Direct Video URL (e.g. https://www.youtube.com/watch?v=...)...">
-          <button id="btn-process-url" class="btn btn-primary">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="5 3 19 12 5 21 5 3"></polygon>
-            </svg>
-            Process Video Link
-          </button>
-        </div>
-        <div class="url-hint-row">
-          <span class="text-muted">Storage Saver:</span>
-          <span class="url-chip url-chip-emerald">⚡ Low-Storage Stream (&lt; 500 MB)</span>
-          <span class="url-chip">🔄 Auto-purges on reload</span>
-          <span class="url-chip">▶ YouTube &amp; Web Video</span>
-        </div>
-      </div>
+      <!-- ================================================================= -->
+      <!-- 1. MERCURY COMMAND HERO SECTION WITH WEBGL PARTICLE RIPPLE CANVAS -->
+      <!-- ================================================================= -->
+      <section id="upload-section" class="mercury-hero-section">
 
-      <div class="or-divider-row">
-        <span class="divider-line"></span>
-        <span class="divider-text">OR UPLOAD LOCAL FILE</span>
-        <span class="divider-line"></span>
-      </div>
-
-      <div class="dropzone-card" id="dropzone">
-        <input type="file" id="video-file-input" accept="video/mp4,video/mkv,video/quicktime,video/webm" hidden>
-        <div class="dropzone-inner">
-          <div class="upload-icon-circle">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
-              <path d="M12 12v9"></path>
-              <path d="m16 16-4-4-4 4"></path>
-            </svg>
-          </div>
-          <h3>Drag & Drop your video lecture here</h3>
-          <p class="dropzone-sub">Supports MP4, MOV, MKV, WebM up to 2GB</p>
-          <div class="dropzone-btn-row">
-            <button class="btn btn-primary" onclick="document.getElementById('video-file-input').click()">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="17 8 12 3 7 8"></polyline>
-                <line x1="12" y1="3" x2="12" y2="15"></line>
-              </svg>
-              Browse Computer
-            </button>
-            <span class="or-separator">or</span>
-            <button id="btn-load-sample" class="btn btn-glass" type="button">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-              </svg>
-              Try Sample Lecture
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Processing Overlay Modal -->
-    <div id="processing-modal" class="modal-overlay hidden">
-      <div class="modal-box">
-        <div class="modal-header">
-          <div class="spinner-ring"></div>
-          <div>
-            <h3>VidSeek AI Processing Engine</h3>
-            <p id="proc-filename" class="text-muted">Analyzing video stream...</p>
-          </div>
-        </div>
-
-        <div class="progress-track-wrapper">
-          <div class="progress-bar-glow">
-            <div id="proc-bar" class="progress-bar-fill" style="width: 10%;"></div>
-          </div>
-          <div class="progress-meta">
-            <span id="proc-stage-text">Initializing pipeline...</span>
-            <span id="proc-percent" class="mono">10%</span>
-          </div>
-        </div>
-
-        <div class="pipeline-steps-grid">
-          <div class="step-card" id="step-dl">
-            <span class="step-num">0</span>
-            <div>
-              <div class="step-name">Link Fetch / Download</div>
-              <div class="step-detail">YouTube / Stream Extraction</div>
-            </div>
-          </div>
-          <div class="step-card" id="step-meta">
-            <span class="step-num">1</span>
-            <div>
-              <div class="step-name">Video Inspection</div>
-              <div class="step-detail">FPS, duration, resolution</div>
-            </div>
-          </div>
-          <div class="step-card" id="step-audio">
-            <span class="step-num">2</span>
-            <div>
-              <div class="step-name">Audio Extraction</div>
-              <div class="step-detail">FFmpeg 16kHz PCM Stream</div>
-            </div>
-          </div>
-          <div class="step-card" id="step-whisper">
-            <span class="step-num">3</span>
-            <div>
-              <div class="step-name">Whisper AI STT</div>
-              <div class="step-detail">Timed Speech Recognition</div>
-            </div>
-          </div>
-          <div class="step-card" id="step-topics">
-            <span class="step-num">4</span>
-            <div>
-              <div class="step-name">Topic Detection</div>
-              <div class="step-detail">Semantic Dips & Chapters</div>
-            </div>
-          </div>
-          <div class="step-card" id="step-split">
-            <span class="step-num">5</span>
-            <div>
-              <div class="step-name">FFmpeg Segmentation</div>
-              <div class="step-detail">Fast Stream Copy Slicing</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Active Workspace Dashboard -->
-    <section id="workspace-section" class="workspace hidden">
-      <!-- Top Title Bar -->
-      <div class="workspace-header">
-        <div class="video-meta-block">
-          <span class="status-live-tag">READY FOR SEARCH & STUDY</span>
-          <h2 id="video-title" class="video-main-heading">Java Programming Masterclass</h2>
-          <div class="meta-pills">
-            <span class="meta-pill" id="meta-duration">⏱️ 00:42</span>
-            <span class="meta-pill" id="meta-chapters">📚 4 Chapters</span>
-            <span class="meta-pill" id="meta-res">🖥️ 1280x720</span>
-            <span class="meta-pill" id="meta-size">💾 0.7 MB</span>
-          </div>
-        </div>
-
-        <!-- Workspace Action Tools: Study Mode, Full Quiz, Download Notes -->
-        <div class="header-tools">
-          <button id="btn-open-study-mode" class="btn btn-primary" title="Launch Interactive AI Study Mode">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
-              <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
-            </svg>
-            <span>Study Mode</span>
-          </button>
-          <button id="btn-open-full-quiz" class="btn btn-secondary" title="Take Full Lecture Mastery Quiz">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
-            <span>Lecture Quiz</span>
-          </button>
-          <a id="btn-download-notes" class="btn btn-secondary" href="#">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="16" y1="13" x2="8" y2="13"></line>
-              <line x1="16" y1="17" x2="8" y2="17"></line>
-              <polyline points="10 9 9 9 8 9"></polyline>
-            </svg>
-            Download Notes (.md)
-          </a>
-        </div>
-      </div>
-
-      <!-- Main 2-Column Theater Layout -->
-      <div class="theater-grid">
-        <!-- Left: Video Player & Timeline -->
-        <div class="player-column">
-          <div class="video-card">
-            <div class="video-container">
-              <video id="main-player" controls preload="metadata" playsinline></video>
-              <div class="chapter-toast" id="current-chapter-toast">
-                <span class="toast-indicator">▶ CURRENT TOPIC</span>
-                <span id="toast-title">Introduction to Java</span>
-              </div>
-            </div>
-
-            <!-- Custom Chapter Timeline Bar -->
-            <div class="chapter-timeline-wrap">
-              <div class="timeline-label-row">
-                <span>Interactive Chapter Timeline</span>
-                <span class="mono text-muted" id="timeline-time-display">00:00 / 00:42</span>
-              </div>
-              <div class="timeline-bar" id="chapter-timeline-bar">
-                <!-- Dynamically populated chapter segments -->
-              </div>
-            </div>
+        <div class="mercury-hero-content mercury-reveal">
+          <!-- Badge Pill -->
+          <div class="badge-pill mb-s8">
+            <span class="pulse-dot"></span>
+            WHISPER AI • FFMPEG STREAM COPY • NLP TOPIC BOUNDARIES
           </div>
 
-          <!-- Tab Navigation -->
-          <div class="section-tabs">
-            <button class="tab-btn active" data-tab="chapters-tab">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
-                <line x1="7" y1="2" x2="7" y2="22"></line>
-                <line x1="17" y1="2" x2="17" y2="22"></line>
-                <line x1="2" y1="12" x2="22" y2="12"></line>
-              </svg>
-              Topic-wise Video Chapters (<span id="tab-chap-count">0</span>)
-            </button>
-            <button class="tab-btn" data-tab="search-tab">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <!-- Headline -->
+          <h1 class="mercury-display-title">Orchestrate your video lectures</h1>
+
+          <!-- Subtitle -->
+          <p class="mercury-hero-sub">
+            VidSeek Command turns hours of lecture footage into topic-wise mini-videos, synchronized transcripts, timestamp search, and interactive AI study tools — built directly into your workspace.
+          </p>
+
+          <!-- Mercury Command Floating Capsule Bar -->
+          <div class="mercury-command-capsule">
+            <div class="mercury-command-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
-              Search & Timestamp Jump
-            </button>
-            <button class="tab-btn" data-tab="qa-tab">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+            </div>
+            <input
+              type="url"
+              id="mercury-hero-command-input"
+              class="mercury-command-input"
+              placeholder="Paste YouTube link or command (e.g. https://www.youtube.com/watch?v=...)..."
+              autocomplete="off"
+            >
+            <button id="btn-mercury-execute-command" class="mercury-btn-primary" type="button">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
               </svg>
-              Ask AI About Video
-            </button>
-            <button class="tab-btn" data-tab="notes-tab">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-              </svg>
-              Lecture Notes
+              <span>Execute Command</span>
             </button>
           </div>
 
-          <!-- TAB 1: Sliced Video Chapters Grid -->
-          <div id="chapters-tab" class="tab-content active">
-            <div class="tab-subhead">
-              <h3>✂️ Generated Topic-wise Video Files</h3>
-              <p>Each topic has been automatically separated into an independent video clip. Watch individually or download directly.</p>
-            </div>
-            <div class="chapters-grid" id="chapters-grid-container">
-              <!-- Dynamically rendered chapter cards -->
-            </div>
+          <!-- Hidden Form Synchronizers for app.js Compatibility -->
+          <input type="url" id="video-url-input" hidden>
+          <button id="btn-process-url" hidden></button>
+
+          <!-- Quick Suggestion Chips -->
+          <div class="mercury-prompt-chips">
+            <button class="mercury-chip mercury-chip-sample" type="button" id="btn-load-sample">
+              <span>▶ Try Sample Lecture (Java Masterclass)</span>
+            </button>
+            <span class="mercury-chip" onclick="applySearch('what is order by')">
+              ⚡ Low-Storage Stream (&lt; 500 MB)
+            </span>
+            <span class="mercury-chip" onclick="applySearch('where clause')">
+              ✂️ Auto-Divide Chapters
+            </span>
+            <span class="mercury-chip" onclick="applySearch('group by')">
+              🎯 Jump to Timestamps
+            </span>
+            <span class="mercury-chip" onclick="document.getElementById('video-file-input').click()">
+              📁 Upload Local File
+            </span>
           </div>
 
-          <!-- TAB 2: Intelligent Timestamp Search -->
-          <div id="search-tab" class="tab-content">
-            <div class="search-box-card">
-              <div class="search-input-wrap">
+          <!-- Local File Drag & Drop Drawer Trigger -->
+          <div class="mercury-drop-trigger-box" id="dropzone">
+            <input type="file" id="video-file-input" accept="video/mp4,video/mkv,video/quicktime,video/webm" hidden>
+            <div class="mercury-drop-info">
+              <div class="mercury-drop-icon">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="11" cy="11" r="8"></circle>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+                  <path d="M12 12v9"></path>
+                  <path d="m16 16-4-4-4 4"></path>
                 </svg>
-                <input type="text" id="search-query-input" placeholder="e.g. 'Show me where loops are explained', 'variables', 'polymorphism'...">
-                <button id="btn-run-search" class="btn btn-primary btn-sm">Search Video</button>
               </div>
-              <div class="search-suggest-row">
-                <span class="text-muted">Try searching:</span>
-                <button class="chip-btn" onclick="applySearch('what is order by')">🎯 What is ORDER BY?</button>
-                <button class="chip-btn" onclick="applySearch('group by')">📊 GROUP BY</button>
-                <button class="chip-btn" onclick="applySearch('where clause')">🔍 WHERE Clause</button>
+              <div>
+                <div class="mercury-drop-title">Drag & drop your local video file here</div>
+                <div class="mercury-drop-sub">Supports MP4, MOV, MKV, WebM up to 2GB</div>
               </div>
             </div>
-
-            <div id="search-results-list" class="search-results-list">
-              <div class="empty-state">
-                <p>Type a topic or concept above to pinpoint exact video moments.</p>
-              </div>
+            <div class="flex items-center gap-s8">
+              <button class="mercury-btn-tonal text-xs" type="button" onclick="document.getElementById('video-file-input').click()">
+                Browse Computer
+              </button>
             </div>
           </div>
+        </div>
+      </section>
 
-          <!-- TAB 3: Ask Questions (AI Q&A) -->
-          <div id="qa-tab" class="tab-content">
-            <div class="qa-card">
-              <div class="qa-header">
-                <h3>🤖 Ask Questions About the Video</h3>
-                <p>AI will analyze the lecture transcript, explain the concept, and give you the direct timestamp jump link.</p>
-              </div>
+      <!-- ================================================================= -->
+      <!-- 2. SECTION: SAY WHAT YOU NEED AND THE WORK GETS DONE (SHOWCASE)    -->
+      <!-- ================================================================= -->
+      <section class="mercury-showcase-section">
+        <div class="mercury-showcase-container">
+          <div class="mercury-section-header">
+            <h2 class="mercury-section-title">Say what you need and the work gets done</h2>
+            <p class="mercury-section-desc">
+              VidSeek Command turns natural language and lecture footage into completed knowledge across your workspace.
+            </p>
+          </div>
 
-              <div class="qa-input-bar">
-                <input type="text" id="qa-question-input" placeholder="e.g. 'What is order by and how does it work?'">
-                <button id="btn-submit-qa" class="btn btn-primary">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                  </svg>
-                  Ask AI
-                </button>
-              </div>
-
-              <div class="qa-suggest-pills">
-                <button class="chip-btn chip-btn-accent" id="btn-ask-current-topic" title="Ask question about current playing topic">🎯 Ask About Current Topic</button>
-                <button class="chip-btn" onclick="askQuestion('What is this lecture explaining?')">Summary of this video?</button>
-                <button class="chip-btn" onclick="askQuestion('What are the main concepts covered?')">Key concepts?</button>
-                <button class="chip-btn" onclick="askQuestion('Explain with examples from the video')">Give an example</button>
-              </div>
-
-              <div id="qa-answers-feed" class="qa-feed">
-                <!-- Answer bubbles populated dynamically with follow-up and explain simply actions -->
-              </div>
-
-              <!-- Question History Container -->
-              <div class="qa-history-box" id="qa-history-box">
-                <div class="qa-history-header">
-                  <div class="qa-hist-title">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <polyline points="12 6 12 12 16 14"></polyline>
+          <div class="mercury-showcase-grid">
+            <!-- Left Accordion Items -->
+            <div class="mercury-accordion-list">
+              <!-- Item 0: Insights -->
+              <div class="mercury-accordion-item" data-command-accordion-item data-state="open">
+                <button type="button" class="mercury-accordion-btn" data-command-accordion-btn data-state="open">
+                  <span class="mercury-accordion-title">Get insights from your video data</span>
+                  <div class="mercury-accordion-icon command-acc-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
-                    <span>Question History (<span id="qa-history-count">0</span>)</span>
                   </div>
-                  <span class="text-muted text-sm">Click any question to view past answer</span>
+                </button>
+                <div class="mercury-accordion-body" data-command-accordion-content>
+                  See exactly what’s happening in your lecture. Discover topic boundaries, semantic shifts, and speech density automatically without manual chapter markers.
                 </div>
-                <div class="qa-history-list" id="qa-history-list">
-                  <p class="text-muted text-sm" style="padding: 0.5rem 0;">No previous questions asked yet for this video.</p>
+              </div>
+
+              <!-- Item 1: Divide Chapters -->
+              <div class="mercury-accordion-item" data-command-accordion-item data-state="closed">
+                <button type="button" class="mercury-accordion-btn" data-command-accordion-btn data-state="closed">
+                  <span class="mercury-accordion-title">Divide long lectures into topic chapters</span>
+                  <div class="mercury-accordion-icon command-acc-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                  </div>
+                </button>
+                <div class="mercury-accordion-body" data-command-accordion-content>
+                  Clean up 2-hour long lectures into bite-sized, standalone chapter video clips sliced with FFmpeg stream copy — zero re-encoding time or quality degradation.
+                </div>
+              </div>
+
+              <!-- Item 2: Q&A -->
+              <div class="mercury-accordion-item" data-command-accordion-item data-state="closed">
+                <button type="button" class="mercury-accordion-btn" data-command-accordion-btn data-state="closed">
+                  <span class="mercury-accordion-title">Ask natural questions &amp; jump to timestamps</span>
+                  <div class="mercury-accordion-icon command-acc-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                  </div>
+                </button>
+                <div class="mercury-accordion-body" data-command-accordion-content>
+                  Ask anything in plain conversational English. The AI pinpoints the teacher's exact explanation and seeks the video directly to the second it was spoken.
+                </div>
+              </div>
+
+              <!-- Item 3: Quizzes -->
+              <div class="mercury-accordion-item" data-command-accordion-item data-state="closed">
+                <button type="button" class="mercury-accordion-btn" data-command-accordion-btn data-state="closed">
+                  <span class="mercury-accordion-title">Generate mastery quizzes &amp; study notes</span>
+                  <div class="mercury-accordion-icon command-acc-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                  </div>
+                </button>
+                <div class="mercury-accordion-body" data-command-accordion-content>
+                  Produce interactive multiple-choice quizzes, detect weak topics under 60% accuracy, and export formatted Markdown study guides for offline learning.
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- TAB 4: Lecture Notes -->
-          <div id="notes-tab" class="tab-content">
-            <div class="notes-paper" id="notes-content-container">
-              <!-- Rendered markdown notes -->
+            <!-- Right Showcase Card with Mercury Mesh Gradients -->
+            <div class="mercury-preview-card-wrap">
+              <div class="mercury-card-mesh-1"></div>
+              <div class="mercury-card-mesh-2"></div>
+              <div class="mercury-card-mesh-3"></div>
+
+              <!-- User Prompt Bubble -->
+              <div class="mercury-prompt-bubble" id="command-preview-prompt-text">
+                Show lecture structure and topic boundaries for Java Programming
+              </div>
+
+              <!-- Agent Execution Card -->
+              <div class="mercury-agent-card" id="command-preview-card">
+                <div class="mercury-agent-card-header">
+                  <span class="mercury-agent-card-title" id="command-preview-card-title">
+                    Topic Boundaries &amp; Semantic Cohesion
+                  </span>
+                  <button type="button" class="mercury-agent-card-pill" id="command-preview-action-btn">
+                    <span>View in Theater</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                  </button>
+                </div>
+                <div class="mercury-agent-card-body" id="command-preview-content">
+                  <!-- Populated by mercury-command.js -->
+                </div>
+              </div>
             </div>
           </div>
         </div>
+      </section>
 
-        <!-- Right Column: Interactive Synchronized Transcript -->
-        <div class="transcript-column">
-          <div class="transcript-card">
-            <div class="transcript-header">
-              <div class="transcript-title-row">
-                <div class="tr-title">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="8" y1="6" x2="21" y2="6"></line>
-                    <line x1="8" y1="12" x2="21" y2="12"></line>
-                    <line x1="8" y1="18" x2="21" y2="18"></line>
-                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                  </svg>
-                  Synchronized Transcript
-                </div>
-                <span class="transcript-hint">Click any line to seek video</span>
-              </div>
-              <div class="transcript-filter-box">
-                <input type="text" id="transcript-filter" placeholder="Filter transcript words...">
-              </div>
-            </div>
 
-            <div class="transcript-scroll-area" id="transcript-container">
-              <!-- Segments rendered here -->
+
+
+
+      <!-- ================================================================= -->
+      <!-- 6. ACTIVE WORKSPACE THEATER & STUDY MODE (OPENED WHEN VIDEO READY)-->
+      <!-- ================================================================= -->
+      <section id="workspace-section" class="workspace hidden">
+        <div class="workspace-header">
+          <div class="video-meta-block">
+            <span class="status-live-tag">READY FOR SEARCH &amp; STUDY</span>
+            <h2 id="video-title" class="video-main-heading">Java Programming Masterclass</h2>
+            <div class="meta-pills">
+              <span class="meta-pill" id="meta-duration">⏱️ 00:42</span>
+              <span class="meta-pill" id="meta-chapters">📚 4 Chapters</span>
+              <span class="meta-pill" id="meta-res">🖥️ 1280x720</span>
+              <span class="meta-pill" id="meta-size">💾 0.7 MB</span>
             </div>
           </div>
-        </div>
-      </div>
 
-      <!-- AI STUDY MODE VIEW (A1 & A2) -->
-      <div id="study-mode-view" class="study-mode-container hidden">
-        <div class="study-mode-header-bar">
-          <div class="study-mode-title-group">
-            <button id="btn-close-study-mode" class="btn btn-secondary btn-sm" title="Return to Video Theater">
+          <!-- Header Tools -->
+          <div class="header-tools">
+            <button id="btn-open-study-mode" class="mercury-btn-primary" title="Launch Interactive AI Study Mode">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="19" y1="12" x2="5" y2="12"></line>
-                <polyline points="12 19 5 12 12 5"></polyline>
+                <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+                <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
               </svg>
-              <span>Back to Video Theater</span>
+              <span>Study Mode</span>
             </button>
-            <div class="badge-pill">🎓 AI STUDY MODE DASHBOARD</div>
-            <h3 id="study-mode-video-title" class="study-heading">Java Programming Masterclass</h3>
-          </div>
-          <div class="study-mode-header-actions">
-            <button class="btn btn-primary" id="btn-study-full-quiz">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button id="btn-open-full-quiz" class="mercury-btn-tonal" title="Take Full Lecture Mastery Quiz">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10"></circle>
                 <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
                 <line x1="12" y1="17" x2="12.01" y2="17"></line>
               </svg>
-              Take Full Lecture Quiz
+              <span>Lecture Quiz</span>
             </button>
+            <button id="btn-open-events-quiz" class="mercury-btn-tonal" title="Take Temporal Event Video Quiz">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              <span>Events Quiz</span>
+            </button>
+            <a id="btn-download-notes" class="mercury-btn-tonal" href="#">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+              </svg>
+              <span>Notes (.md)</span>
+            </a>
           </div>
         </div>
 
-        <!-- A1. Study Mode Dashboard Metrics -->
-        <div class="study-dashboard-metrics">
-          <div class="study-metric-card">
-            <span class="study-metric-label">DETECTED TOPICS</span>
-            <span class="study-metric-val" id="study-stat-total-topics">0</span>
-            <span class="study-metric-sub">Automatically Segmented</span>
-          </div>
-          <div class="study-metric-card">
-            <span class="study-metric-label">TOPICS COMPLETED</span>
-            <span class="study-metric-val text-emerald" id="study-stat-completed">0</span>
-            <span class="study-metric-sub" id="study-stat-remaining-sub">0 Remaining</span>
-          </div>
-          <div class="study-metric-card">
-            <span class="study-metric-label">TOTAL STUDY TIME</span>
-            <span class="study-metric-val" id="study-stat-study-time">0m</span>
-            <span class="study-metric-sub">Active Engagement</span>
-          </div>
-          <div class="study-metric-card study-metric-progress">
-            <div class="study-progress-header">
-              <span class="study-metric-label">LEARNING PROGRESS</span>
-              <span class="study-metric-percent mono" id="study-stat-progress-pct">0%</span>
+        <!-- Main 2-Column Theater Layout -->
+        <div class="theater-grid">
+          <!-- Left: Video Player & Timeline -->
+          <div class="player-column">
+            <div class="video-card">
+              <div class="video-container">
+                <video id="main-player" controls preload="metadata" playsinline></video>
+                <div class="chapter-toast" id="current-chapter-toast">
+                  <span class="toast-indicator">▶ CURRENT TOPIC</span>
+                  <span id="toast-title">Introduction to Java</span>
+                </div>
+              </div>
+
+              <!-- Custom Chapter Timeline Bar -->
+              <div class="chapter-timeline-wrap">
+                <div class="timeline-label-row">
+                  <span>Interactive Chapter Timeline</span>
+                  <span class="mono text-muted" id="timeline-time-display">00:00 / 00:42</span>
+                </div>
+                <div class="timeline-bar" id="chapter-timeline-bar">
+                  <!-- Dynamically populated chapter segments -->
+                </div>
+              </div>
+
+              <!-- Multi-Track Temporal Event & Anomaly Timeline Visualizer -->
+              <div class="temporal-tracks-wrap" id="temporal-tracks-wrap">
+                <div class="track-header-row">
+                  <div class="track-label-pill">
+                    <span class="pulse-dot-sm"></span>
+                    <span>⏱️ BiLSTM Temporal Events Track</span>
+                  </div>
+                  <span class="track-count-badge" id="track-events-count">0 Events</span>
+                </div>
+                <div class="temporal-track-bar" id="events-timeline-track" title="Click event to seek video player">
+                  <!-- Dynamically populated clickable event markers -->
+                </div>
+
+                <div class="track-header-row" style="margin-top: 0.4rem;">
+                  <div class="track-label-pill track-label-warning">
+                    <span class="pulse-dot-sm warning"></span>
+                    <span>⚠ Autoencoder Reconstruction Anomaly Track</span>
+                  </div>
+                  <span class="track-count-badge warning" id="track-anomalies-count">0 Anomalies</span>
+                </div>
+                <div class="temporal-track-bar anomaly-track-bar" id="anomalies-timeline-track" title="Click anomaly slice to inspect unusual activity">
+                  <!-- Visual anomaly spikes & heat markers -->
+                </div>
+              </div>
             </div>
-            <div class="study-progress-bar-bg">
-              <div class="study-progress-bar-fill" id="study-stat-progress-fill" style="width: 0%;"></div>
+
+            <!-- Tab Navigation (5 Core Sections: Video Analysis, Temporal Events, Anomaly Detection, AI Q&A, AI MCQs + Notes) -->
+            <div class="section-tabs" id="main-section-tabs">
+              <button class="tab-btn active" data-tab="chapters-tab" title="Existing Video Analysis: Chapters & Sliced Clips">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                  <line x1="7" y1="2" x2="7" y2="22"></line>
+                  <line x1="17" y1="2" x2="17" y2="22"></line>
+                  <line x1="2" y1="12" x2="22" y2="12"></line>
+                </svg>
+                <span>Topic Chapters (<span id="tab-chap-count">0</span>)</span>
+              </button>
+              <button class="tab-btn" data-tab="events-tab" id="tab-btn-events" title="BiLSTM Temporal Video Event Detection">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <span>Temporal Events (<span id="tab-events-count">0</span>)</span>
+              </button>
+              <button class="tab-btn" data-tab="anomalies-tab" id="tab-btn-anomalies" title="Autoencoder Video Anomaly & Unusual Activity Detection">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                  <line x1="12" y1="9" x2="12" y2="13"></line>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                <span>Anomaly Detection (<span id="tab-anomalies-count">0</span>)</span>
+              </button>
+              <button class="tab-btn" data-tab="search-tab" title="NLP Content Search & Passage Retrieval">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <span>NLP Search</span>
+              </button>
+              <button class="tab-btn" data-tab="qa-tab" title="AI Q&A with Temporal Event Reasoning">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                </svg>
+                <span>AI Q&amp;A</span>
+              </button>
+              <button class="tab-btn" data-tab="mcq-tab" id="tab-btn-mcq" title="AI MCQs Grounded in Detected Video Events">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                <span>AI MCQs</span>
+              </button>
+              <button class="tab-btn" data-tab="notes-tab" title="Generated Lecture Notes">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                </svg>
+                <span>Lecture Notes</span>
+              </button>
             </div>
-            <span class="study-metric-sub" id="study-progress-subtext">Complete quizzes and study topics to master lecture</span>
+
+            <!-- TAB 1: Sliced Video Chapters Grid -->
+            <div id="chapters-tab" class="tab-content active">
+              <div class="tab-subhead">
+                <h3>✂️ Generated Topic-wise Video Files</h3>
+                <p>Each topic has been automatically sliced into an independent clip. Watch individually or download directly.</p>
+              </div>
+              <div class="chapters-grid" id="chapters-grid-container">
+                <!-- Dynamically rendered chapter cards -->
+              </div>
+            </div>
+
+            <!-- TAB: Temporal Events (BiLSTM) -->
+            <div id="events-tab" class="tab-content">
+              <div class="tab-subhead">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+                  <div>
+                    <h3>⏱️ BiLSTM Temporal Video Understanding &amp; Event Sequence</h3>
+                    <p>Understands video frames as a continuous chronological sequence rather than independent frames. Click any event to seek player.</p>
+                  </div>
+                  <div class="badge-pill">
+                    <span class="pulse-dot"></span>
+                    <span>BiLSTM Sequence Model</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Temporal Event Filters / Summary Row -->
+              <div class="events-summary-banner">
+                <div class="events-metric-box">
+                  <span class="metric-label">DETECTED EVENTS</span>
+                  <span class="metric-val" id="events-stat-count">0</span>
+                </div>
+                <div class="events-metric-box">
+                  <span class="metric-label">AVG CONFIDENCE</span>
+                  <span class="metric-val text-emerald" id="events-stat-conf">92%</span>
+                </div>
+                <div class="events-metric-box">
+                  <span class="metric-label">SEQUENCE MODEL</span>
+                  <span class="metric-val text-accent">BiLSTM + Dense</span>
+                </div>
+                <div class="events-action-box">
+                  <button id="btn-quick-events-quiz" class="mercury-btn-primary text-xs">
+                    <span>🎯 Quiz on Events</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="temporal-events-list" id="temporal-events-container">
+                <!-- Dynamically populated event cards -->
+              </div>
+            </div>
+
+            <!-- TAB: Anomaly Detection (Autoencoder) -->
+            <div id="anomalies-tab" class="tab-content">
+              <div class="tab-subhead">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+                  <div>
+                    <h3>⚠ Autoencoder Latent Reconstruction &amp; Anomaly Detection</h3>
+                    <p>Learns normal baseline video activity and calculates reconstruction errors. Pinpoints unusual activity with objective indicators.</p>
+                  </div>
+                  <div class="badge-pill">
+                    <span class="pulse-dot-sm warning"></span>
+                    <span>Reconstruction MSE Metric</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Anomaly Metrics Summary Card -->
+              <div class="anomaly-summary-card" id="anomaly-summary-card">
+                <div class="anomaly-metric-item">
+                  <span class="anomaly-metric-label">DETECTED ANOMALIES</span>
+                  <span class="anomaly-metric-value text-warning" id="anomaly-stat-count">0</span>
+                  <span class="anomaly-metric-sub">Unusual segments</span>
+                </div>
+                <div class="anomaly-metric-item">
+                  <span class="anomaly-metric-label">PEAK ANOMALY SCORE</span>
+                  <span class="anomaly-metric-value" id="anomaly-stat-peak">0.00</span>
+                  <span class="anomaly-metric-sub">Reconstruction deviation</span>
+                </div>
+                <div class="anomaly-metric-item">
+                  <span class="anomaly-metric-label">BASELINE ERROR (MSE)</span>
+                  <span class="anomaly-metric-value" id="anomaly-stat-baseline">0.000</span>
+                  <span class="anomaly-metric-sub">Learned steady-state</span>
+                </div>
+                <div class="anomaly-metric-item">
+                  <span class="anomaly-metric-label">ANOMALY THRESHOLD</span>
+                  <span class="anomaly-metric-value" id="anomaly-stat-threshold">0.000</span>
+                  <span class="anomaly-metric-sub">Dynamic cutoff</span>
+                </div>
+              </div>
+
+              <!-- Interactive Timeline Bins Matrix -->
+              <div class="anomaly-timeline-section">
+                <div class="timeline-label-row">
+                  <span>Reconstruction Error Timeline (Click any slice to jump)</span>
+                  <span class="mono text-muted" id="anomaly-timeline-legend">Green = Normal • Amber/Red = Potential Anomaly</span>
+                </div>
+                <div class="anomaly-timeline-grid" id="anomaly-timeline-grid">
+                  <!-- Time slice bars -->
+                </div>
+              </div>
+
+              <!-- Anomaly Segment Cards -->
+              <div class="anomalies-list" id="anomalies-list-container">
+                <!-- Dynamically rendered anomaly cards -->
+              </div>
+            </div>
+
+            <!-- TAB 2: Intelligent Timestamp Search -->
+            <div id="search-tab" class="tab-content">
+              <div class="search-box-card">
+                <div class="search-input-wrap">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  <input type="text" id="search-query-input" placeholder="e.g. 'Show me where loops are explained', 'variables'...">
+                  <button id="btn-run-search" class="mercury-btn-primary text-xs">Search Video</button>
+                </div>
+                <div class="search-suggest-row">
+                  <span class="text-muted">Try searching:</span>
+                  <button class="chip-btn" onclick="applySearch('what is order by')">🎯 What is ORDER BY?</button>
+                  <button class="chip-btn" onclick="applySearch('group by')">📊 GROUP BY</button>
+                  <button class="chip-btn" onclick="applySearch('where clause')">🔍 WHERE Clause</button>
+                </div>
+              </div>
+
+              <div id="search-results-list" class="search-results-list">
+                <div class="empty-state">
+                  <p>Type a topic or concept above to pinpoint exact video moments.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB 3: Ask Questions (AI Q&A) -->
+            <div id="qa-tab" class="tab-content">
+              <div class="qa-card">
+                <div class="qa-header">
+                  <h3>🤖 Ask Questions About the Video</h3>
+                  <p>AI will analyze the lecture transcript, explain the concept, and give you the direct timestamp jump link.</p>
+                </div>
+
+                <div class="qa-input-bar">
+                  <input type="text" id="qa-question-input" placeholder="e.g. 'What is order by and how does it work?'">
+                  <button id="btn-submit-qa" class="mercury-btn-primary text-xs">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="22" y1="2" x2="11" y2="13"></line>
+                      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                    <span>Ask AI</span>
+                  </button>
+                </div>
+
+                <div class="qa-suggest-pills">
+                  <button class="chip-btn chip-btn-accent" id="btn-ask-current-topic" title="Ask question about current playing topic">🎯 Ask About Current Topic</button>
+                  <button class="chip-btn chip-btn-temporal" onclick="askTemporalQuestion('What happened around 00:20?')">⏱️ Around 00:20?</button>
+                  <button class="chip-btn chip-btn-temporal" onclick="askTemporalQuestion('What happened before loops were explained?')">⏮️ Before loops?</button>
+                  <button class="chip-btn chip-btn-temporal" onclick="askTemporalQuestion('What happened after variables?')">⏭️ After variables?</button>
+                  <button class="chip-btn" onclick="askQuestion('What is this lecture explaining?')">Summary of this video?</button>
+                  <button class="chip-btn" onclick="askQuestion('What are the main concepts covered?')">Key concepts?</button>
+                  <button class="chip-btn" onclick="askQuestion('Explain with examples from the video')">Give an example</button>
+                </div>
+
+                <div id="qa-answers-feed" class="qa-feed">
+                  <!-- Dynamic QA answers -->
+                </div>
+
+                <!-- Question History Container -->
+                <div class="qa-history-box" id="qa-history-box">
+                  <div class="qa-history-header">
+                    <div class="qa-hist-title">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                      </svg>
+                      <span>Question History (<span id="qa-history-count">0</span>)</span>
+                    </div>
+                    <span class="text-muted text-xs">Click any question to view past answer</span>
+                  </div>
+                  <div class="qa-history-list" id="qa-history-list">
+                    <p class="text-muted text-sm" style="padding: 0.5rem 0;">No previous questions asked yet for this video.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB: AI MCQs (Temporal Event Grounded) -->
+            <div id="mcq-tab" class="tab-content">
+              <div class="tab-subhead">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+                  <div>
+                    <h3>🎯 Temporal AI MCQs — Grounded in Video Events</h3>
+                    <p>Multiple choice questions generated from actual detected video events and timestamps rather than random questions.</p>
+                  </div>
+                  <button id="btn-start-temporal-quiz" class="mercury-btn-primary text-xs">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    <span>Take Interactive Quiz</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="mcq-preview-feed" id="event-mcqs-feed">
+                <!-- Dynamically populated event MCQs -->
+              </div>
+            </div>
+
+            <!-- TAB 4: Lecture Notes -->
+            <div id="notes-tab" class="tab-content">
+              <div class="notes-paper" id="notes-content-container">
+                <!-- Rendered markdown notes -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Interactive Synchronized Transcript -->
+          <div class="transcript-column">
+            <div class="transcript-card">
+              <div class="transcript-header">
+                <div class="transcript-title-row">
+                  <div class="tr-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="8" y1="6" x2="21" y2="6"></line>
+                      <line x1="8" y1="12" x2="21" y2="12"></line>
+                      <line x1="8" y1="18" x2="21" y2="18"></line>
+                      <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                      <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                      <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                    </svg>
+                    Synchronized Transcript
+                  </div>
+                  <span class="transcript-hint">Click line to seek</span>
+                </div>
+                <div class="transcript-filter-box">
+                  <input type="text" id="transcript-filter" placeholder="Filter transcript words...">
+                </div>
+              </div>
+
+              <div class="transcript-scroll-area" id="transcript-container">
+                <!-- Timed Whisper segments rendered here -->
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- A2. Topic-Based Study Cards Grid -->
-        <div class="study-section-subhead">
-          <div>
-            <h3>📚 Topic-by-Topic Learning Modules</h3>
-            <p class="text-muted">Master each topic independently with summaries, concepts, transcripts, and quizzes.</p>
+        <!-- AI STUDY MODE VIEW -->
+        <div id="study-mode-view" class="study-mode-container hidden">
+          <div class="study-mode-header-bar">
+            <div class="study-mode-title-group">
+              <button id="btn-close-study-mode" class="mercury-btn-tonal text-xs" title="Return to Video Theater">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="19" y1="12" x2="5" y2="12"></line>
+                  <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                <span>Back to Theater</span>
+              </button>
+              <div class="badge-pill">🎓 AI STUDY MODE DASHBOARD</div>
+              <h3 id="study-mode-video-title" class="study-heading">Java Programming Masterclass</h3>
+            </div>
+            <div class="study-mode-header-actions">
+              <button class="mercury-btn-primary text-xs" id="btn-study-full-quiz">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                <span>Take Full Lecture Quiz</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Study Mode Dashboard Metrics -->
+          <div class="study-dashboard-metrics">
+            <div class="study-metric-card">
+              <span class="study-metric-label">DETECTED TOPICS</span>
+              <span class="study-metric-val" id="study-stat-total-topics">0</span>
+              <span class="study-metric-sub">Automatically Segmented</span>
+            </div>
+            <div class="study-metric-card">
+              <span class="study-metric-label">TOPICS COMPLETED</span>
+              <span class="study-metric-val text-emerald" id="study-stat-completed">0</span>
+              <span class="study-metric-sub" id="study-stat-remaining-sub">0 Remaining</span>
+            </div>
+            <div class="study-metric-card">
+              <span class="study-metric-label">TOTAL STUDY TIME</span>
+              <span class="study-metric-val" id="study-stat-study-time">0m</span>
+              <span class="study-metric-sub">Active Engagement</span>
+            </div>
+            <div class="study-metric-card study-metric-progress">
+              <div class="study-progress-header">
+                <span class="study-metric-label">LEARNING PROGRESS</span>
+                <span class="study-metric-percent mono" id="study-stat-progress-pct">0%</span>
+              </div>
+              <div class="study-progress-bar-bg">
+                <div class="study-progress-bar-fill" id="study-stat-progress-fill" style="width: 0%;"></div>
+              </div>
+              <span class="study-metric-sub" id="study-progress-subtext">Complete quizzes and study topics to master lecture</span>
+            </div>
+          </div>
+
+          <!-- Topic-Based Study Cards Grid -->
+          <div class="study-section-subhead">
+            <div>
+              <h3>📚 Topic-by-Topic Learning Modules</h3>
+              <p class="text-muted">Master each topic independently with summaries, concepts, transcripts, and quizzes.</p>
+            </div>
+          </div>
+
+          <div class="study-topics-grid" id="study-topics-grid">
+            <!-- Dynamically populated topic study cards -->
           </div>
         </div>
+      </section>
 
-        <div class="study-topics-grid" id="study-topics-grid">
-          <!-- Dynamically populated topic study cards -->
-        </div>
-      </div>
-    </section>
     </div><!-- /#page-home -->
 
-    <!-- Page 2: History Page (All Processed Videos & Stored Lectures) -->
+    <!-- ================================================================= -->
+    <!-- PAGE 2: HISTORY (ALL PROCESSED VIDEOS & STORED LECTURES)          -->
+    <!-- ================================================================= -->
     <div id="page-history" class="page-view hidden">
       <div class="page-header-banner">
         <div class="badge-pill">
@@ -586,19 +839,19 @@
             <input type="text" id="history-search-input" placeholder="Search saved videos by title or topic...">
           </div>
           <div class="history-actions-wrap">
-            <button id="btn-refresh-history" class="btn btn-secondary btn-sm" title="Refresh library">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button id="btn-refresh-history" class="mercury-btn-tonal text-xs" title="Refresh library">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="23 4 23 10 17 10"></polyline>
                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
               </svg>
-              Refresh
+              <span>Refresh</span>
             </button>
-            <button id="btn-clear-all-history" class="btn btn-secondary btn-clear-danger btn-sm" title="Delete all videos from history">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button id="btn-clear-all-history" class="mercury-btn-tonal text-xs text-rose-400" title="Delete all videos from history">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
               </svg>
-              Clear All History
+              <span>Clear History</span>
             </button>
           </div>
         </div>
@@ -618,26 +871,21 @@
           </svg>
         </div>
         <h3>No Processed Videos in History Yet</h3>
-        <p>Paste a YouTube URL or upload a video on the Home page to start building your video lecture library.</p>
+        <p>Paste a YouTube URL or upload a video on the Command page to start building your video lecture library.</p>
         <div class="empty-btn-group">
-          <button class="btn btn-primary" onclick="navigateTo('home')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-              <polyline points="9 22 9 12 15 12 15 22"></polyline>
-            </svg>
-            Go to Home &amp; Upload
+          <button class="mercury-btn-primary" onclick="navigateTo('home')">
+            <span>Go to Command Center</span>
           </button>
-          <button class="btn btn-secondary" onclick="loadSampleDemo()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="5 3 19 12 5 21 5 3"></polygon>
-            </svg>
-            Load Sample Lecture
+          <button class="mercury-btn-tonal" onclick="loadSampleDemo()">
+            <span>Load Sample Lecture</span>
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Page 3: Learning Analytics & My Learning Dashboard -->
+    <!-- ================================================================= -->
+    <!-- PAGE 3: LEARNING ANALYTICS (DASHBOARD & PERFORMANCE TRACKER)       -->
+    <!-- ================================================================= -->
     <div id="page-analytics" class="page-view hidden">
       <div class="page-header-banner">
         <div class="badge-pill">
@@ -654,7 +902,7 @@
         </p>
       </div>
 
-      <!-- B6. Continue Learning Hero Card -->
+      <!-- Continue Learning Hero Card -->
       <div class="analytics-continue-wrap" id="analytics-continue-container">
         <div class="continue-learning-card" id="analytics-continue-card">
           <div class="continue-left">
@@ -662,24 +910,23 @@
             <h3 id="continue-video-title">Java Programming Masterclass</h3>
             <p id="continue-topic-text">You stopped at: <strong id="continue-topic-name">Introduction &amp; Variables</strong> (<span class="mono" id="continue-timestamp">00:15</span>)</p>
           </div>
-          <button id="btn-continue-watching" class="btn btn-primary btn-lg">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <button id="btn-continue-watching" class="mercury-btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <polygon points="5 3 19 12 5 21 5 3"></polygon>
             </svg>
-            Continue Watching
+            <span>Continue Watching</span>
           </button>
         </div>
       </div>
 
-      <!-- B2. Learning Dashboard KPI Metrics (6 Cards) -->
+      <!-- Learning Dashboard KPI Metrics (6 Cards) -->
       <div class="analytics-kpi-grid">
         <div class="kpi-card">
           <div class="kpi-icon-wrap kpi-blue">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
               <line x1="7" y1="2" x2="7" y2="22"></line>
               <line x1="17" y1="2" x2="17" y2="22"></line>
-              <line x1="2" y1="12" x2="22" y2="12"></line>
             </svg>
           </div>
           <div class="kpi-content">
@@ -691,7 +938,7 @@
 
         <div class="kpi-card">
           <div class="kpi-icon-wrap kpi-indigo">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
               <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
             </svg>
@@ -705,7 +952,7 @@
 
         <div class="kpi-card">
           <div class="kpi-icon-wrap kpi-emerald">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"></circle>
               <polyline points="12 6 12 12 16 14"></polyline>
             </svg>
@@ -719,7 +966,7 @@
 
         <div class="kpi-card">
           <div class="kpi-icon-wrap kpi-amber">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"></circle>
               <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
               <line x1="12" y1="17" x2="12.01" y2="17"></line>
@@ -734,7 +981,7 @@
 
         <div class="kpi-card">
           <div class="kpi-icon-wrap kpi-purple">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
             </svg>
           </div>
@@ -747,7 +994,7 @@
 
         <div class="kpi-card">
           <div class="kpi-icon-wrap kpi-rose">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
               <polyline points="22 4 12 14.01 9 11.01"></polyline>
             </svg>
@@ -760,7 +1007,7 @@
         </div>
       </div>
 
-      <!-- B5. Weak Topic Detection Section -->
+      <!-- Weak Topic Detection Section -->
       <div class="analytics-weak-topics-section" id="analytics-weak-topics-container">
         <div class="weak-topics-header">
           <div class="weak-badge">EDUCATIONAL PERFORMANCE INDICATOR</div>
@@ -772,9 +1019,8 @@
         </div>
       </div>
 
-      <!-- Two-Column Learning Layout: Topic Progress Checklist & Study Activity -->
+      <!-- Two-Column Layout: Progress Checklist & Weekly Activity -->
       <div class="analytics-two-col-layout">
-        <!-- Left: B3. Video Topic Progress Checklists -->
         <div class="analytics-progress-col">
           <div class="analytics-card">
             <div class="analytics-card-header">
@@ -787,7 +1033,6 @@
           </div>
         </div>
 
-        <!-- Right: B4. Learning Statistics & Weekly Activity -->
         <div class="analytics-stats-col">
           <div class="analytics-card">
             <div class="analytics-card-header">
@@ -798,22 +1043,13 @@
               <!-- Dynamically rendered SVG bar chart -->
             </div>
           </div>
-
-          <div class="analytics-card" style="margin-top: 1.5rem;">
-            <div class="analytics-card-header">
-              <h3>🎯 Learning Mastery Tips</h3>
-            </div>
-            <ul class="learning-tips-list">
-              <li><strong>Topic Quizzes:</strong> Taking topic quizzes immediately after watching boosts concept retention by over 40%.</li>
-              <li><strong>Jump to Explanation:</strong> When an answer is incorrect, click <em>Watch Explanation</em> to jump straight to the teacher's exact quote.</li>
-              <li><strong>Ask Follow-ups:</strong> Use conversational follow-ups in the AI Q&amp;A tab to clear any ambiguities in real time.</li>
-            </ul>
-          </div>
         </div>
       </div>
     </div>
 
-    <!-- Page 4: About & Guide Page (Steps to Use & System Architecture) -->
+    <!-- ================================================================= -->
+    <!-- PAGE 4: ABOUT & GUIDE (STEPS & SYSTEM ARCHITECTURE)               -->
+    <!-- ================================================================= -->
     <div id="page-about" class="page-view hidden">
       <div class="page-header-banner">
         <div class="badge-pill">
@@ -824,98 +1060,13 @@
           </svg>
           User Guide &amp; Technical Architecture
         </div>
-        <h1 class="page-header-title">About <span class="gradient-text">VidSeek AI</span></h1>
+        <h1 class="page-header-title">About <span class="gradient-text">VidSeek Command</span></h1>
         <p class="page-header-sub">
-          VidSeek AI is an intelligent lecture comprehension engine that transforms long unstructured video lectures into segmented topic-wise mini-videos, synchronized transcripts, timestamped semantic search, and interactive AI study tools.
+          VidSeek Command is an intelligent lecture comprehension engine that transforms long unstructured video lectures into segmented topic-wise mini-videos, synchronized transcripts, timestamped semantic search, and interactive AI study tools.
         </p>
       </div>
 
-      <!-- How to Use Section -->
-      <section class="about-section">
-        <div class="about-section-header">
-          <div class="about-sec-badge">STEP-BY-STEP WORKFLOW</div>
-          <h2>How to Use VidSeek AI</h2>
-          <p class="text-muted">Master any complex video lecture in 6 simple steps</p>
-        </div>
-
-        <div class="about-steps-grid">
-          <div class="about-step-card">
-            <div class="step-badge-num">1</div>
-            <div class="step-card-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-              </svg>
-            </div>
-            <h3>Provide Any Video</h3>
-            <p>Paste a YouTube URL or direct video link in the URL bar, drag-and-drop a local video file (MP4, MKV, WebM, MOV) from your computer, or click <strong>"Try Sample Lecture"</strong> for an instant demonstration.</p>
-          </div>
-
-          <div class="about-step-card">
-            <div class="step-badge-num">2</div>
-            <div class="step-card-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-              </svg>
-            </div>
-            <h3>Automated AI Pipeline</h3>
-            <p>The system extracts the high-fidelity 16kHz audio stream, generates timed speech transcripts using <strong>OpenAI Whisper</strong>, and applies NLP topic boundary detection to pinpoint natural conceptual shifts.</p>
-          </div>
-
-          <div class="about-step-card">
-            <div class="step-badge-num">3</div>
-            <div class="step-card-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="6" cy="6" r="3"></circle>
-                <circle cx="6" cy="18" r="3"></circle>
-                <line x1="20" y1="4" x2="8.12" y2="15.88"></line>
-                <line x1="14.47" y1="14.48" x2="20" y2="20"></line>
-                <line x1="8.12" y1="8.12" x2="12" y2="12"></line>
-              </svg>
-            </div>
-            <h3>FFmpeg Video Slicing</h3>
-            <p>Using fast stream-copy slicing (no re-encoding delay or quality degradation), the long video is separated into individual topic-wise mini video clips with dedicated thumbnails and start/end time markers.</p>
-          </div>
-
-          <div class="about-step-card">
-            <div class="step-badge-num">4</div>
-            <div class="step-card-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg>
-            </div>
-            <h3>Search &amp; Jump Timestamps</h3>
-            <p>Type any keyword or concept into the search box to get instant ranked results. Click <strong>"Jump to Timestamp"</strong> to seek the master player to the exact second that concept is discussed.</p>
-          </div>
-
-          <div class="about-step-card">
-            <div class="step-badge-num">5</div>
-            <div class="step-card-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-              </svg>
-            </div>
-            <h3>Ask AI &amp; Download Notes</h3>
-            <p>Ask natural questions about the lecture to receive AI explanations accompanied by direct video citations. Download comprehensive lecture summary notes in Markdown format for offline study.</p>
-          </div>
-
-          <div class="about-step-card">
-            <div class="step-badge-num">6</div>
-            <div class="step-card-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <polyline points="12 6 12 12 16 14"></polyline>
-              </svg>
-            </div>
-            <h3>Persistent Video History</h3>
-            <p>Every video you analyze is securely saved to your local History library. Switch between different videos at any time, review previous transcripts, or resume where you left off with a single click.</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- System Architecture Section -->
+      <!-- Architecture Cards -->
       <section class="about-section">
         <div class="about-section-header">
           <div class="about-sec-badge">ENGINEERING ARCHITECTURE</div>
@@ -969,39 +1120,83 @@
           </div>
         </div>
       </section>
+    </div>
 
-      <!-- Pro Tips Card -->
-      <div class="about-tips-card">
-        <div class="tips-icon">💡</div>
-        <div class="tips-body">
-          <h3>Pro Tips for the Best Experience</h3>
-          <ul>
-            <li><strong>YouTube Videos:</strong> You can paste any standard YouTube link (e.g. <code>https://www.youtube.com/watch?v=...</code>) or shortened URL (<code>https://youtu.be/...</code>).</li>
-            <li><strong>Interactive Transcript:</strong> Click on any segment in the synchronized transcript pane to instantly jump the video playback to that exact word.</li>
-            <li><strong>Keyboard Shortcuts:</strong> Use Spacebar to pause/play, Left/Right arrow keys to jump 5 seconds, and M to mute.</li>
-            <li><strong>Topic Mini-Videos:</strong> Each chapter card has its own dedicated player and download link so you can share or archive specific lecture sections.</li>
-          </ul>
+    <!-- ================================================================= -->
+    <!-- MODALS: PROCESSING, QUIZ, TOPIC STUDY                             -->
+    <!-- ================================================================= -->
+
+    <!-- Processing Overlay Modal with Mercury Command Spinner -->
+    <div id="processing-modal" class="modal-overlay hidden">
+      <div class="modal-box">
+        <div class="modal-header">
+          <div class="spinner-ring"></div>
+          <div>
+            <h3>VidSeek Command Pipeline Engine</h3>
+            <p id="proc-filename" class="text-muted">Analyzing video stream...</p>
+          </div>
         </div>
-      </div>
 
-      <!-- CTA Card -->
-      <div class="about-cta-card">
-        <h2>Ready to explore a lecture?</h2>
-        <p>Head over to the Home page to upload a video or explore the sample lecture.</p>
-        <button class="btn btn-primary btn-lg" onclick="navigateTo('home')">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-            <polyline points="9 22 9 12 15 12 15 22"></polyline>
-          </svg>
-          Go to Home Page
-        </button>
+        <div class="progress-track-wrapper">
+          <div class="progress-bar-glow">
+            <div id="proc-bar" class="progress-bar-fill" style="width: 10%;"></div>
+          </div>
+          <div class="progress-meta">
+            <span id="proc-stage-text">Initializing pipeline...</span>
+            <span id="proc-percent" class="mono">10%</span>
+          </div>
+        </div>
+
+        <div class="pipeline-steps-grid">
+          <div class="step-card" id="step-dl">
+            <span class="step-num">0</span>
+            <div>
+              <div class="step-name">Link Fetch / Download</div>
+              <div class="step-detail">YouTube / Stream Extraction</div>
+            </div>
+          </div>
+          <div class="step-card" id="step-meta">
+            <span class="step-num">1</span>
+            <div>
+              <div class="step-name">Video Inspection</div>
+              <div class="step-detail">FPS, duration, resolution</div>
+            </div>
+          </div>
+          <div class="step-card" id="step-audio">
+            <span class="step-num">2</span>
+            <div>
+              <div class="step-name">Audio Extraction</div>
+              <div class="step-detail">FFmpeg 16kHz PCM Stream</div>
+            </div>
+          </div>
+          <div class="step-card" id="step-whisper">
+            <span class="step-num">3</span>
+            <div>
+              <div class="step-name">Whisper AI STT</div>
+              <div class="step-detail">Timed Speech Recognition</div>
+            </div>
+          </div>
+          <div class="step-card" id="step-topics">
+            <span class="step-num">4</span>
+            <div>
+              <div class="step-name">Topic Detection</div>
+              <div class="step-detail">Semantic Dips &amp; Chapters</div>
+            </div>
+          </div>
+          <div class="step-card" id="step-split">
+            <span class="step-num">5</span>
+            <div>
+              <div class="step-name">FFmpeg Segmentation</div>
+              <div class="step-detail">Fast Stream Copy Slicing</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- C. INTERACTIVE MCQ / QUIZ MODAL -->
+    <!-- Interactive MCQ / Quiz Modal -->
     <div id="quiz-modal" class="modal-overlay hidden">
       <div class="modal-box quiz-modal-box">
-        <!-- Quiz Header -->
         <div class="quiz-modal-header">
           <div class="quiz-header-info">
             <span class="quiz-badge" id="quiz-type-badge">TOPIC MASTERY QUIZ</span>
@@ -1010,7 +1205,6 @@
           <button class="modal-close-btn" id="btn-close-quiz-modal" title="Close Quiz">✕</button>
         </div>
 
-        <!-- Progress Tracker Bar -->
         <div class="quiz-progress-track">
           <div class="quiz-progress-meta">
             <span id="quiz-step-counter">Question 1 of 5</span>
@@ -1021,15 +1215,12 @@
           </div>
         </div>
 
-        <!-- Active Question Card View -->
         <div id="quiz-question-view" class="quiz-question-container">
           <h4 class="quiz-question-text" id="quiz-question-text">Loading question...</h4>
-
           <div class="quiz-options-grid" id="quiz-options-container">
-            <!-- Rendered 4 choices: option-a, option-b, option-c, option-d -->
+            <!-- Rendered 4 choices -->
           </div>
 
-          <!-- Immediate Feedback Box (Shown after selecting an answer) -->
           <div id="quiz-feedback-box" class="quiz-feedback-card hidden">
             <div class="feedback-banner" id="feedback-banner">
               <span class="feedback-icon" id="feedback-icon">✓</span>
@@ -1037,19 +1228,17 @@
             </div>
             <p class="feedback-explanation" id="feedback-explanation">Explanation text...</p>
             <div class="feedback-actions">
-              <!-- CRITICAL FEATURE: Watch Explanation Jump Button -->
-              <button class="btn btn-secondary btn-sm" id="btn-quiz-jump-explanation" title="Seek video player to explanation timestamp">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+              <button class="mercury-btn-tonal text-xs" id="btn-quiz-jump-explanation" title="Seek video player to explanation timestamp">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                   <polygon points="5 3 19 12 5 21 5 3"></polygon>
                 </svg>
                 <span>Watch Explanation (<span id="feedback-time-display">00:00</span>)</span>
               </button>
-              <button class="btn btn-primary btn-sm" id="btn-quiz-next">Next Question ➔</button>
+              <button class="mercury-btn-primary text-xs" id="btn-quiz-next">Next Question ➔</button>
             </div>
           </div>
         </div>
 
-        <!-- Quiz Final Results View (Shown after completing all questions) -->
         <div id="quiz-results-view" class="quiz-results-container hidden">
           <div class="results-score-circle" id="results-score-circle">
             <span class="score-number" id="results-score-num">80%</span>
@@ -1067,32 +1256,31 @@
             </div>
           </div>
 
-          <!-- Weak Topic Alert Banner if accuracy < 60% -->
           <div id="quiz-weak-topic-alert" class="quiz-weak-alert hidden">
             <span>⚠ Educational Indicator:</span> Score is below 60%. We recommend revising this topic before attempting the quiz again.
           </div>
 
           <div class="results-actions-row">
-            <button class="btn btn-secondary" id="btn-retake-quiz">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button class="mercury-btn-tonal text-xs" id="btn-retake-quiz">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="23 4 23 10 17 10"></polyline>
                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
               </svg>
-              Retake Quiz
+              <span>Retake Quiz</span>
             </button>
-            <button class="btn btn-primary" id="btn-finish-quiz">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button class="mercury-btn-primary text-xs" id="btn-finish-quiz">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                 <polyline points="22 4 12 14.01 9 11.01"></polyline>
               </svg>
-              Finish &amp; View Progress
+              <span>Finish &amp; View Progress</span>
             </button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- A3. DEEP-DIVE STUDY TOPIC MODAL -->
+    <!-- Deep-Dive Study Topic Modal -->
     <div id="study-topic-modal" class="modal-overlay hidden">
       <div class="modal-box study-topic-box">
         <div class="modal-header">
@@ -1105,60 +1293,52 @@
         </div>
 
         <div class="study-flow-content">
-          <!-- Step 1: Summary -->
           <div class="flow-card">
             <span class="flow-step-tag">STEP 1 • TOPIC OVERVIEW</span>
             <h4>Executive Summary</h4>
             <p id="study-flow-summary" class="flow-text">Topic summary content...</p>
           </div>
 
-          <!-- Step 2: Key Concepts -->
           <div class="flow-card">
             <span class="flow-step-tag">STEP 2 • IMPORTANT CONCEPTS</span>
             <h4>Key Concepts &amp; Terminology</h4>
-            <div class="flow-concepts-chips" id="study-flow-concepts">
-              <!-- Concept pills -->
-            </div>
+            <div class="flow-concepts-chips" id="study-flow-concepts"></div>
           </div>
 
-          <!-- Step 3: Transcript Excerpt -->
           <div class="flow-card">
             <span class="flow-step-tag">STEP 3 • RELEVANT TRANSCRIPT</span>
             <h4>Spoken Transcript</h4>
-            <div class="flow-transcript-box" id="study-flow-transcript">
-              <!-- Transcript lines with click-to-seek -->
-            </div>
+            <div class="flow-transcript-box" id="study-flow-transcript"></div>
           </div>
 
-          <!-- Step 4 & 5: Actions -->
           <div class="flow-card flow-card-actions">
             <span class="flow-step-tag">STEP 4 • PRACTICE &amp; MASTERY</span>
             <h4>Interactive Actions</h4>
             <div class="flow-btns-row">
-              <button class="btn btn-secondary" id="btn-flow-watch-topic">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <button class="mercury-btn-tonal text-xs" id="btn-flow-watch-topic">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                   <polygon points="5 3 19 12 5 21 5 3"></polygon>
                 </svg>
-                Watch Topic Video
+                <span>Watch Topic Video</span>
               </button>
-              <button class="btn btn-primary" id="btn-flow-take-quiz">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <button class="mercury-btn-primary text-xs" id="btn-flow-take-quiz">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="10"></circle>
                   <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
                   <line x1="12" y1="17" x2="12.01" y2="17"></line>
                 </svg>
-                Take Topic Quiz
+                <span>Take Topic Quiz</span>
               </button>
-              <button class="btn btn-glass" id="btn-flow-ask-ai">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <button class="mercury-btn-tonal text-xs" id="btn-flow-ask-ai">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
                 </svg>
-                Ask AI About Topic
+                <span>Ask AI About Topic</span>
               </button>
             </div>
-            <div class="flow-complete-row">
-              <button class="btn btn-emerald" id="btn-flow-mark-complete">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <div class="flow-complete-row mt-s12">
+              <button class="mercury-btn-tonal text-xs text-emerald-400" id="btn-flow-mark-complete">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
                 <span>Mark Topic as Completed</span>
@@ -1168,8 +1348,12 @@
         </div>
       </div>
     </div>
+
   </main>
 
+  <!-- Application Scripts -->
+  <script src="/static/js/mercury-canvas.js"></script>
+  <script src="/static/js/mercury-command.js"></script>
   <script src="/static/js/app.js"></script>
 </body>
 </html>

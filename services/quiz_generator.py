@@ -139,6 +139,39 @@ def generate_full_lecture_quiz(video_id, chapters, full_segments=None):
     }
 
 
+def generate_temporal_events_quiz(video_id, temporal_events, count=5):
+    """
+    Generates or retrieves cached interactive MCQ quiz grounded strictly
+    in actual detected video temporal events.
+    """
+    cached = get_cached_quiz(video_id, 0, quiz_type="temporal")
+    if cached and cached.get("questions"):
+        return cached
+
+    logger.info(f"Generating temporal event MCQ quiz for video {video_id} with {len(temporal_events)} events")
+
+    from services.temporal_qa import generate_temporal_mcqs
+    questions = generate_temporal_mcqs(temporal_events, count=count)
+
+    quiz_title = "Temporal Video Events Mastery Quiz"
+    quiz_id = save_quiz_with_questions(
+        video_id=video_id,
+        topic_id=0,
+        title=quiz_title,
+        quiz_type="temporal",
+        questions=questions
+    )
+
+    return {
+        "quiz_id": quiz_id,
+        "video_id": video_id,
+        "topic_id": 0,
+        "title": quiz_title,
+        "quiz_type": "temporal",
+        "questions": questions
+    }
+
+
 # ================= Gemini Structured Generator ================= #
 
 def _generate_with_gemini(topic_title, summary, key_points, segments, count=5):

@@ -35,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupAnalytics();
   setupEnhancedQA();
   setupWatchTracker();
+  setupTemporalFeatures();
 
   // Load initial history count to update badge
   loadHistory(true);
@@ -325,8 +326,20 @@ function renderWorkspace(job) {
   // Render Interactive Timeline Bar
   renderTimelineBar(job.chapters, job.video_info.duration);
 
+  // Render Multi-Track Timeline (BiLSTM Events & Autoencoder Anomalies)
+  renderTemporalTracks(job.temporal_events || [], job.anomalies || [], job.video_info.duration);
+
   // Render Sliced Chapters Grid
   renderChaptersGrid(job.chapters, job.job_id);
+
+  // Render BiLSTM Temporal Events List
+  renderTemporalEvents(job.temporal_events || [], job.video_info.duration);
+
+  // Render Autoencoder Anomaly Detection
+  renderAnomalies(job.anomalies || [], job.anomaly_timeline || [], job.anomaly_summary || {}, job.video_info.duration);
+
+  // Render Temporal Event MCQs
+  renderEventMCQs(job.job_id, job.temporal_events || []);
 
   // Render Synchronized Transcript
   renderTranscript(job.segments);
@@ -717,7 +730,12 @@ function setupTheme() {
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   };
 
-  const applyTheme = (theme) => {
+  const applyTheme = (theme, animate = false) => {
+    if (animate) {
+      document.documentElement.classList.add('theme-transitioning');
+      if (btn) btn.classList.add('theme-spin');
+    }
+
     document.documentElement.setAttribute('data-theme', theme);
     document.body.setAttribute('data-theme', theme);
     localStorage.setItem('vidseek-theme', theme);
@@ -727,17 +745,41 @@ function setupTheme() {
     if (btn) {
       btn.setAttribute('title', `Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`);
     }
+
+    window.dispatchEvent(new CustomEvent('vidseek-theme-changed', { detail: { theme } }));
+
+    if (animate) {
+      setTimeout(() => {
+        document.documentElement.classList.remove('theme-transitioning');
+        if (btn) btn.classList.remove('theme-spin');
+      }, 500);
+    }
   };
 
-  // Initial sync
+  function triggerFullscreenThemeRipple(sourceEl, theme) {
+    try {
+      const ripple = document.createElement('div');
+      ripple.className = 'fullscreen-theme-ripple ' + (theme === 'light' ? 'to-light' : 'to-dark');
+      const rect = sourceEl ? sourceEl.getBoundingClientRect() : { left: window.innerWidth / 2, top: 40, width: 0, height: 0 };
+      ripple.style.left = (rect.left + (rect.width || 0) / 2) + 'px';
+      ripple.style.top = (rect.top + (rect.height || 0) / 2) + 'px';
+      document.body.appendChild(ripple);
+      setTimeout(() => {
+        if (ripple.parentNode) ripple.parentNode.removeChild(ripple);
+      }, 800);
+    } catch (e) {}
+  }
+
+  // Initial sync without animation
   const currentTheme = getSavedTheme();
-  applyTheme(currentTheme);
+  applyTheme(currentTheme, false);
 
   if (btn) {
     btn.addEventListener('click', () => {
       const current = document.documentElement.getAttribute('data-theme') || 'dark';
       const next = current === 'dark' ? 'light' : 'dark';
-      applyTheme(next);
+      triggerFullscreenThemeRipple(btn, next);
+      applyTheme(next, true);
     });
   }
 
@@ -745,7 +787,7 @@ function setupTheme() {
   if (window.matchMedia) {
     window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
       if (!localStorage.getItem('vidseek-theme')) {
-        applyTheme(e.matches ? 'light' : 'dark');
+        applyTheme(e.matches ? 'light' : 'dark', true);
       }
     });
   }
@@ -1458,6 +1500,22 @@ function renderQuizQuestion() {
   const q = activeQuizData.questions[activeQuizQuestionIdx];
   const total = activeQuizData.questions.length;
 
+  // Normalize options and timestamps if coming from temporal event MCQs
+  if (!q.options && (q.option_a || q.option_b)) {
+    q.options = {
+      A: q.option_a || '',
+      B: q.option_b || '',
+      C: q.option_c || '',
+      D: q.option_d || ''
+    };
+  }
+  if (q.source_timestamp !== undefined && q.timestamp === undefined) {
+    q.timestamp = q.source_timestamp;
+  }
+  if (q.source_time_fmt && !q.timestamp_formatted) {
+    q.timestamp_formatted = q.source_time_fmt;
+  }
+
   document.getElementById('quiz-question-view').classList.remove('hidden');
   document.getElementById('quiz-results-view').classList.add('hidden');
   document.getElementById('quiz-feedback-box').classList.add('hidden');
@@ -1749,7 +1807,13 @@ function renderVideoProgressChecklists(videoProgress) {
   container.innerHTML = '';
 
   if (!videoProgress || videoProgress.length === 0) {
-    container.innerHTML = `<p class="text-muted text-sm" style="padding: 1rem;">No video topics logged yet. Process or study a lecture to see topic checklists.</p>`;
+    container.innerHTML = `
+      <div class="video-progress-empty" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2.5rem 1rem; text-align: center; height: 100%;">
+        <span style="font-size: 2.2rem; margin-bottom: 0.6rem; opacity: 0.85;">📚</span>
+        <h4 style="font-size: 1.05rem; font-weight: 650; margin-bottom: 0.35rem;">No Video Topics Logged Yet</h4>
+        <p class="text-muted text-sm" style="max-width: 340px; line-height: 1.55; margin: 0 auto;">Process a lecture video or launch AI Study Mode to track topic-by-topic checklists and mastery status.</p>
+      </div>
+    `;
     return;
   }
 
@@ -1796,17 +1860,21 @@ function renderActivityChart(activity) {
   if (!container) return;
   container.innerHTML = '';
 
-  if (!activity || activity.length === 0) {
-    container.innerHTML = `<div class="text-muted text-sm" style="padding: 1.5rem; text-align: center;">No activity recorded for the past 7 days yet.</div>`;
-    return;
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  let chartData = activity;
+  if (!chartData || chartData.length === 0) {
+    chartData = days.map(d => ({ day_name: d, minutes: 0 }));
   }
 
-  const maxMins = Math.max(...activity.map(a => a.minutes || 0), 30);
+  const maxMins = Math.max(...chartData.map(a => a.minutes || 0), 30);
+  const totalMins = chartData.reduce((sum, a) => sum + (a.minutes || 0), 0);
+  const activeDays = chartData.filter(a => (a.minutes || 0) > 0).length;
+  const avgMins = Math.round(totalMins / 7);
 
   const chart = document.createElement('div');
   chart.className = 'activity-chart-grid';
 
-  activity.forEach(a => {
+  chartData.forEach(a => {
     const barHeightPct = Math.round(((a.minutes || 0) / maxMins) * 100);
     const col = document.createElement('div');
     col.className = 'chart-col';
@@ -1820,7 +1888,25 @@ function renderActivityChart(activity) {
     chart.appendChild(col);
   });
 
+  const summaryRow = document.createElement('div');
+  summaryRow.className = 'activity-summary-row';
+  summaryRow.innerHTML = `
+    <div class="activity-summary-item">
+      <span class="activity-sum-val">${totalMins}m</span>
+      <span class="activity-sum-lbl">Total Studied</span>
+    </div>
+    <div class="activity-summary-item">
+      <span class="activity-sum-val">${avgMins}m/day</span>
+      <span class="activity-sum-lbl">Daily Average</span>
+    </div>
+    <div class="activity-summary-item">
+      <span class="activity-sum-val">${activeDays}/7</span>
+      <span class="activity-sum-lbl">Active Days</span>
+    </div>
+  `;
+
   container.appendChild(chart);
+  container.appendChild(summaryRow);
 }
 
 // ==========================================================================
@@ -2061,6 +2147,339 @@ function setupWatchTracker() {
       })
     }).catch(() => {});
   });
+}
+
+// =========================================================================
+// FEATURE 1, 2, 3: TEMPORAL EVENTS, ANOMALY DETECTION & EVENT MCQS
+// =========================================================================
+
+function setupTemporalFeatures() {
+  const btnHeaderEventsQuiz = document.getElementById('btn-open-events-quiz');
+  if (btnHeaderEventsQuiz) {
+    btnHeaderEventsQuiz.addEventListener('click', () => {
+      openTemporalEventQuiz(currentJobId);
+    });
+  }
+
+  const btnQuickEventsQuiz = document.getElementById('btn-quick-events-quiz');
+  if (btnQuickEventsQuiz) {
+    btnQuickEventsQuiz.addEventListener('click', () => {
+      openTemporalEventQuiz(currentJobId);
+    });
+  }
+
+  const btnStartTemporalQuiz = document.getElementById('btn-start-temporal-quiz');
+  if (btnStartTemporalQuiz) {
+    btnStartTemporalQuiz.addEventListener('click', () => {
+      openTemporalEventQuiz(currentJobId);
+    });
+  }
+}
+
+function openTemporalEventQuiz(jobId) {
+  if (!jobId) jobId = currentJobId;
+  if (!jobId) {
+    alert('Please open a video first.');
+    return;
+  }
+  startQuizSession(`/api/quiz/temporal/${jobId}`, 'TEMPORAL VIDEO EVENT QUIZ');
+}
+
+function renderTemporalTracks(events, anomalies, totalDuration) {
+  const eventsTrack = document.getElementById('events-timeline-track');
+  const anomaliesTrack = document.getElementById('anomalies-timeline-track');
+  const eventsCount = document.getElementById('track-events-count');
+  const anomaliesCount = document.getElementById('track-anomalies-count');
+
+  if (!eventsTrack || !anomaliesTrack) return;
+  eventsTrack.innerHTML = '';
+  anomaliesTrack.innerHTML = '';
+
+  const dur = (totalDuration && totalDuration > 0) ? totalDuration : 1;
+  const numEvents = events ? events.length : 0;
+  const numAnomalies = anomalies ? anomalies.length : 0;
+
+  if (eventsCount) eventsCount.innerText = `${numEvents} Events`;
+  if (anomaliesCount) anomaliesCount.innerText = `${numAnomalies} Anomalies`;
+
+  // Render Event Segments on Timeline Track
+  if (events && events.length > 0) {
+    events.forEach(e => {
+      const eStart = parseFloat(e.start || 0);
+      const eEnd = parseFloat(e.end || eStart + 1);
+      const segDur = Math.max(0.5, eEnd - eStart);
+      const pct = Math.max(1.5, (segDur / dur) * 100);
+
+      const el = document.createElement('div');
+      el.className = 'event-track-seg';
+      el.style.width = `${pct}%`;
+      el.style.backgroundColor = e.color || '#38bdf8';
+      el.title = `${e.interval_formatted} — ${e.category}: ${e.description} (${e.confidence_pct})`;
+
+      el.addEventListener('click', () => {
+        seekTo(eStart);
+        switchTab('events-tab');
+      });
+
+      eventsTrack.appendChild(el);
+    });
+  } else {
+    eventsTrack.innerHTML = `<span style="font-size:0.7rem; color:var(--text-muted); padding-left:8px;">No temporal events detected</span>`;
+  }
+
+  // Render Anomalies on Anomaly Timeline Track
+  if (anomalies && anomalies.length > 0) {
+    anomalies.forEach(a => {
+      const aStart = parseFloat(a.timestamp || 0);
+      const aEnd = parseFloat(a.end_timestamp || aStart + 1);
+      const aDur = Math.max(0.5, aEnd - aStart);
+      const leftPct = (aStart / dur) * 100;
+      const widthPct = Math.max(2.0, (aDur / dur) * 100);
+
+      const el = document.createElement('div');
+      el.className = 'anomaly-track-seg';
+      el.style.position = 'absolute';
+      el.style.left = `${leftPct}%`;
+      el.style.width = `${widthPct}%`;
+      el.style.backgroundColor = a.severity === 'High' ? '#f43f5e' : '#fbbf24';
+      el.style.height = `${Math.round(a.score * 100)}%`;
+      el.title = `⚠ ${a.interval_formatted} — Unusual Activity (Score: ${a.score}): ${a.explanation}`;
+
+      el.addEventListener('click', () => {
+        seekTo(aStart);
+        switchTab('anomalies-tab');
+      });
+
+      anomaliesTrack.appendChild(el);
+    });
+  } else {
+    anomaliesTrack.innerHTML = `<span style="font-size:0.7rem; color:#34d399; padding-left:8px;">✓ All video segments consistent with learned steady-state baseline</span>`;
+  }
+}
+
+function renderTemporalEvents(events, totalDuration) {
+  const container = document.getElementById('temporal-events-container');
+  const tabCount = document.getElementById('tab-events-count');
+  const statCount = document.getElementById('events-stat-count');
+  const statConf = document.getElementById('events-stat-conf');
+
+  if (!container) return;
+  container.innerHTML = '';
+
+  const numEvents = events ? events.length : 0;
+  if (tabCount) tabCount.innerText = numEvents;
+  if (statCount) statCount.innerText = numEvents;
+
+  if (!events || events.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <p>No temporal events detected yet. Processing sequence model...</p>
+      </div>
+    `;
+    return;
+  }
+
+  // Compute average confidence
+  const confScores = events.map(e => parseFloat(e.confidence || 0.85));
+  const avgConf = Math.round((confScores.reduce((a, b) => a + b, 0) / confScores.length) * 100);
+  if (statConf) statConf.innerText = `${avgConf}%`;
+
+  events.forEach((ev, idx) => {
+    const card = document.createElement('div');
+    card.className = 'temporal-event-card';
+    card.id = `temporal-event-${ev.id || (idx + 1)}`;
+
+    card.innerHTML = `
+      <div class="temporal-card-header">
+        <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+          <span class="event-category-badge" style="background:${ev.color}1f; color:${ev.color}; border-color:${ev.color}40;">
+            <span>${ev.icon || '⏱️'}</span>
+            <span>${escapeHtml(ev.category || 'Event')}</span>
+          </span>
+          <span class="event-time-pill" onclick="seekTo(${ev.start})" title="Jump to ${ev.interval_formatted}">
+            ▶ ${ev.interval_formatted || formatSeconds(ev.start)}
+          </span>
+        </div>
+        <span class="confidence-pill">
+          ✓ ${ev.confidence_pct || '90%'} Confidence
+        </span>
+      </div>
+      <h4 class="temporal-card-title">${escapeHtml(ev.title || 'Temporal Event')}</h4>
+      <p class="temporal-card-desc">${escapeHtml(ev.description || '')}</p>
+      <div class="temporal-card-actions">
+        <button class="btn btn-primary btn-sm" onclick="seekTo(${ev.start})">
+          ▶ Seek to Moment (${ev.start_formatted})
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="askTemporalQuestion('What happened around ${ev.start_formatted}?')">
+          💬 Ask About This Event
+        </button>
+      </div>
+    `;
+
+    container.appendChild(card);
+  });
+}
+
+function renderAnomalies(anomalies, timeline, summary, totalDuration) {
+  const container = document.getElementById('anomalies-list-container');
+  const gridContainer = document.getElementById('anomaly-timeline-grid');
+  const tabCount = document.getElementById('tab-anomalies-count');
+  const statCount = document.getElementById('anomaly-stat-count');
+  const statPeak = document.getElementById('anomaly-stat-peak');
+  const statBase = document.getElementById('anomaly-stat-baseline');
+  const statThresh = document.getElementById('anomaly-stat-threshold');
+
+  if (tabCount) tabCount.innerText = (anomalies ? anomalies.length : 0);
+  if (statCount) statCount.innerText = (anomalies ? anomalies.length : 0);
+  if (statPeak && summary) statPeak.innerText = summary.max_score ? summary.max_score.toFixed(2) : '0.00';
+  if (statBase && summary) statBase.innerText = summary.baseline_error ? summary.baseline_error.toFixed(3) : '0.000';
+  if (statThresh && summary) statThresh.innerText = summary.threshold ? summary.threshold.toFixed(3) : '0.000';
+
+  // Render Time Slice Grid
+  if (gridContainer && timeline && timeline.length > 0) {
+    gridContainer.innerHTML = '';
+    timeline.forEach(point => {
+      const slice = document.createElement('div');
+      slice.className = 'timeline-slice-block';
+      slice.title = `${point.time_formatted}: ${point.status} (Score: ${point.score}, MSE: ${point.reconstruction_error})`;
+
+      const fill = document.createElement('div');
+      fill.className = 'slice-bar-fill';
+      const fillHeight = Math.max(15, Math.round(point.score * 100));
+      fill.style.height = `${fillHeight}%`;
+
+      if (point.is_anomaly) {
+        fill.style.background = point.score >= 0.8 ? '#f43f5e' : '#fbbf24';
+      } else {
+        fill.style.background = 'rgba(52, 211, 153, 0.4)';
+      }
+
+      slice.appendChild(fill);
+      slice.addEventListener('click', () => {
+        seekTo(point.timestamp);
+      });
+
+      gridContainer.appendChild(slice);
+    });
+  }
+
+  // Render Anomalies Cards List
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (!anomalies || anomalies.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <p>✓ No unusual activity or high reconstruction errors detected. Video matches learned steady-state representation.</p>
+      </div>
+    `;
+    return;
+  }
+
+  anomalies.forEach((a, idx) => {
+    const card = document.createElement('div');
+    card.className = 'anomaly-card';
+
+    card.innerHTML = `
+      <div class="anomaly-card-header">
+        <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+          <span class="severity-pill ${a.severity}">
+            <span>⚠</span>
+            <span>${a.severity} Deviation</span>
+          </span>
+          <span class="event-time-pill" onclick="seekTo(${a.timestamp})" title="Seek to ${a.interval_formatted}">
+            ⏱️ ${a.interval_formatted}
+          </span>
+        </div>
+        <span class="anomaly-score-badge">Reconstruction Score: ${a.score} (${a.score_pct})</span>
+      </div>
+      <p class="anomaly-desc">${escapeHtml(a.explanation)}</p>
+      <div style="display:flex; gap:0.5rem; align-items:center; margin-top:0.25rem;">
+        <button class="btn btn-primary btn-sm" onclick="seekTo(${a.timestamp})">
+          ▶ Jump to Anomaly Moment (${a.timestamp_formatted})
+        </button>
+      </div>
+    `;
+
+    container.appendChild(card);
+  });
+}
+
+function renderEventMCQs(jobId, events) {
+  const feed = document.getElementById('event-mcqs-feed');
+  if (!feed) return;
+  feed.innerHTML = `
+    <div style="padding: 1.5rem; text-align: center; color: var(--text-secondary);">
+      <div class="loading-spinner" style="margin: 0 auto 0.75rem auto;"></div>
+      <p>Grounding interactive MCQs in detected video events...</p>
+    </div>
+  `;
+
+  if (!jobId) return;
+
+  fetch(`/api/quiz/temporal/${jobId}`)
+    .then(res => res.json())
+    .then(data => {
+      const questions = data.questions || [];
+      if (questions.length === 0) {
+        feed.innerHTML = `<div class="empty-state"><p>No event MCQs generated yet.</p></div>`;
+        return;
+      }
+
+      feed.innerHTML = '';
+      questions.forEach((q, idx) => {
+        const card = document.createElement('div');
+        card.className = 'mcq-preview-card';
+
+        const correctLetter = (q.correct_answer || 'A').toUpperCase();
+        const letters = ['A', 'B', 'C', 'D'];
+        const optsHtml = letters.map(l => {
+          const isCorrect = (l === correctLetter);
+          const optText = q[`option_${l.toLowerCase()}`] || (q.options ? q.options[l] : '') || '';
+          return `
+            <div class="mcq-opt-preview-item ${isCorrect ? 'correct' : ''}">
+              <span class="mcq-opt-badge">${l}</span>
+              <span>${escapeHtml(optText)}</span>
+              ${isCorrect ? '<span style="margin-left:auto; color:#34d399; font-weight:700;">✓ Correct</span>' : ''}
+            </div>
+          `;
+        }).join('');
+
+        const timeFmt = q.source_time_fmt || formatSeconds(q.source_timestamp || 0);
+
+        card.innerHTML = `
+          <div class="mcq-card-head">
+            <span class="mcq-num-pill">Question ${idx + 1}</span>
+            <span class="event-time-pill" onclick="seekTo(${q.source_timestamp || 0})">
+              ⏱️ Relevant Moment: ${timeFmt}
+            </span>
+          </div>
+          <h4 class="mcq-question-title">${escapeHtml(q.question)}</h4>
+          <div class="mcq-opts-list">
+            ${optsHtml}
+          </div>
+          <div class="mcq-explanation-box">
+            <span><strong>Explanation:</strong> ${escapeHtml(q.explanation || '')}</span>
+            <button class="btn btn-secondary btn-sm" onclick="seekTo(${q.source_timestamp || 0})">
+              ▶ Watch Moment (${timeFmt})
+            </button>
+          </div>
+        `;
+
+        feed.appendChild(card);
+      });
+    })
+    .catch(err => {
+      feed.innerHTML = `<div class="empty-state"><p>Could not load event MCQs: ${escapeHtml(err.message)}</p></div>`;
+    });
+}
+
+function askTemporalQuestion(questionText) {
+  const input = document.getElementById('qa-question-input');
+  if (input) input.value = questionText;
+  switchTab('qa-tab');
+  const btn = document.getElementById('btn-submit-qa');
+  if (btn) btn.click();
 }
 
 

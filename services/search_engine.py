@@ -10,6 +10,7 @@ if __package__ is None or __package__ == "":
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.video_processor import format_timestamp
+from services.temporal_qa import answer_temporal_question, parse_time_from_text, parse_time_range_from_text
 
 # Technical & compound programming concepts that shouldn't be fragmented into stop words
 DOMAIN_CONCEPTS = {
@@ -163,7 +164,7 @@ def parse_query_intent(query):
     }
 
 
-def search_video(query, segments, chapters, top_k=6):
+def search_video(query, segments, chapters, top_k=6, temporal_events=None):
     """
     Intelligent semantic search that thinks like an LLM:
     - Understands questions and intent ('what is order by' -> definitional explanation of ORDER BY)
@@ -333,6 +334,19 @@ def search_video(query, segments, chapters, top_k=6):
                 if len(term) > 2:
                     snippet = re.sub(rf'\b({re.escape(term)})\b', r'<mark>\1</mark>', snippet, flags=re.IGNORECASE)
 
+            matched_event = None
+            if temporal_events:
+                for ev in temporal_events:
+                    if ev.get("start", 0) <= win["start"] <= ev.get("end", 0) or abs(ev.get("start", 0) - win["start"]) < 4.0:
+                        matched_event = {
+                            "id": ev.get("id"),
+                            "title": ev.get("title"),
+                            "category": ev.get("category"),
+                            "icon": ev.get("icon"),
+                            "confidence": ev.get("confidence")
+                        }
+                        break
+
             # MODULE 2: RANKING - Retain relevant passages with full temporal & topic context
             scored_windows.append({
                 "start": win["start"],
@@ -350,6 +364,7 @@ def search_video(query, segments, chapters, top_k=6):
                 "snippet": snippet,
                 "raw_text": win["text"],
                 "focal_text": win["focal_text"],
+                "matched_event": matched_event,
                 "score": round(total_score, 3),
                 "is_definitional": explanatory_boost > 2.0 or (target and target in chap_title_lower and win["is_chapter_intro"])
             })
@@ -410,13 +425,32 @@ def search_video(query, segments, chapters, top_k=6):
     }
 
 
-def answer_video_question(question, segments, chapters):
+def answer_video_question(question, segments, chapters, temporal_events=None):
     """
     Natural Language Q&A Engine (thinking like an LLM):
     Finds the exact explanatory segment in the video, answers the student's question directly,
     and returns the precise timestamp for video playback jump.
+    Supports chronological and timestamp temporal reasoning when temporal_events are present.
     """
-    if not question or not segments:
+    if not question:
+        return {
+            "answer": "Please ask a question about the video.",
+            "timestamp": 0.0,
+            "timestamp_formatted": "00:00",
+            "chapter_title": "N/A",
+            "confidence": "low"
+        }
+
+    # Check for temporal query pattern: e.g. 'around 01:20', 'before loops', 'after variables', 'between 00:10 and 00:30'
+    q_low = question.lower()
+    has_time = parse_time_from_text(q_low) is not None or parse_time_range_from_text(q_low) is not None
+    has_seq = any(w in q_low for w in ["before", "after", "between", "around", "happened at", "occurred at", "prior to"])
+    if (has_time or has_seq) and temporal_events:
+        temp_res = answer_temporal_question(question, temporal_events, segments, chapters)
+        if temp_res and temp_res.get("confidence") != "low":
+            return temp_res
+
+    if not segments:
         return {
             "answer": "No transcript available to answer the question.",
             "timestamp": 0.0,
@@ -426,7 +460,7 @@ def answer_video_question(question, segments, chapters):
         }
 
     # Run AI semantic search
-    search_data = search_video(question, segments, chapters, top_k=4)
+    search_data = search_video(question, segments, chapters, top_k=4, temporal_events=temporal_events)
     search_hits = search_data.get("results", [])
     ai_best = search_data.get("ai_best_match")
 

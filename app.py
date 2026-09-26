@@ -26,13 +26,16 @@ except Exception:
     pass
 from services.transcriber import transcribe_audio
 from services.topic_detector import generate_chapters, generate_lecture_notes
+from services.temporal_event_detector import detect_temporal_events
+from services.anomaly_detector import detect_anomalies
+from services.temporal_qa import answer_temporal_question, generate_temporal_mcqs
 from services.search_engine import (
     search_video,
     answer_video_question,
     answer_followup_question,
     simplify_answer_explanation
 )
-from services.quiz_generator import generate_topic_quiz, generate_full_lecture_quiz
+from services.quiz_generator import generate_topic_quiz, generate_full_lecture_quiz, generate_temporal_events_quiz
 import services.learning_db as learning_db
 
 load_dotenv()
@@ -213,12 +216,25 @@ def process_video_pipeline(job_id, video_path):
         chapters_enriched = generate_all_chapter_videos(video_path, chapters_raw, job_dir, job_id)
         jobs[job_id]["chapters"] = chapters_enriched
 
+        # Stage 6: BiLSTM Temporal Events & Autoencoder Anomaly Detection
+        jobs[job_id]["stage"] = "temporal_analysis"
+        jobs[job_id]["progress"] = 96
+        jobs[job_id]["message"] = "Running BiLSTM sequence event detection & Autoencoder anomaly scoring..."
+        save_job(job_id, jobs[job_id])
+
+        t_events_res = detect_temporal_events(video_path, segments, video_info["duration"])
+        anoms_res = detect_anomalies(video_path, segments, video_info["duration"])
+        jobs[job_id]["temporal_events"] = t_events_res.get("events", [])
+        jobs[job_id]["anomalies"] = anoms_res.get("anomalies", [])
+        jobs[job_id]["anomaly_timeline"] = anoms_res.get("timeline", [])
+        jobs[job_id]["anomaly_summary"] = anoms_res.get("summary", {})
+
         # Complete
         jobs[job_id]["stage"] = "completed"
         jobs[job_id]["progress"] = 100
         jobs[job_id]["message"] = "Processing complete! All topic videos, chapters, notes, and search ready."
         save_job(job_id, jobs[job_id])
-        logger.info(f"Job {job_id} completed successfully with {len(chapters_enriched)} chapters.")
+        logger.info(f"Job {job_id} completed successfully with {len(chapters_enriched)} chapters and {len(jobs[job_id]['temporal_events'])} temporal events.")
 
     except Exception as e:
         logger.exception(f"Error processing job {job_id}: {e}")
@@ -338,6 +354,23 @@ def get_job(job_id):
             return jsonify({"error": "Job not found"}), 404
 
     job = jobs[job_id]
+
+    # Lazily ensure temporal events and anomaly detection data exist for completed jobs
+    if job.get("stage") == "completed" and "temporal_events" not in job:
+        try:
+            vpath = job.get("video_path")
+            segs = job.get("segments", [])
+            dur = job.get("video_info", {}).get("duration", 0.0)
+            t_events_res = detect_temporal_events(vpath, segs, dur)
+            anoms_res = detect_anomalies(vpath, segs, dur)
+            job["temporal_events"] = t_events_res.get("events", [])
+            job["anomalies"] = anoms_res.get("anomalies", [])
+            job["anomaly_timeline"] = anoms_res.get("timeline", [])
+            job["anomaly_summary"] = anoms_res.get("summary", {})
+            save_job(job_id, job)
+        except Exception as e:
+            logger.warning(f"Lazy temporal analysis extraction error for job {job_id}: {e}")
+
     return jsonify({
         "job_id": job_id,
         "filename": job.get("filename", ""),
@@ -345,6 +378,10 @@ def get_job(job_id):
         "video_info": job.get("video_info", {}),
         "chapters": job.get("chapters", []),
         "segments": job.get("segments", []),
+        "temporal_events": job.get("temporal_events", []),
+        "anomalies": job.get("anomalies", []),
+        "anomaly_timeline": job.get("anomaly_timeline", []),
+        "anomaly_summary": job.get("anomaly_summary", {}),
         "full_transcript": job.get("full_transcript", ""),
         "notes": job.get("notes", ""),
         "master_video_url": f"/api/video/{job_id}/master"
@@ -442,7 +479,12 @@ def search_endpoint():
         return jsonify({"error": "Valid job_id required"}), 400
 
     job = jobs[job_id]
-    search_data = search_video(query, job.get("segments", []), job.get("chapters", []))
+    search_data = search_video(
+        query,
+        job.get("segments", []),
+        job.get("chapters", []),
+        temporal_events=job.get("temporal_events", [])
+    )
     if isinstance(search_data, dict):
         return jsonify({
             "query": query,
@@ -464,7 +506,12 @@ def ask_endpoint():
 
     job = jobs[job_id]
     topic_id = data.get("topic_id", 0)
-    answer_data = answer_video_question(question, job.get("segments", []), job.get("chapters", []))
+    answer_data = answer_video_question(
+        question,
+        job.get("segments", []),
+        job.get("chapters", []),
+        temporal_events=job.get("temporal_events", [])
+    )
 
     qa_id = learning_db.save_qa_history(
         video_id=job_id,
@@ -476,6 +523,134 @@ def ask_endpoint():
     )
     answer_data["qa_id"] = qa_id
     return jsonify(answer_data)
+
+# ================= TEMPORAL DEEP LEARNING ROUTES ================= #
+
+@app.route("/api/video/<job_id>/temporal-events", methods=["GET"])
+def get_temporal_events_endpoint(job_id):
+    if job_id not in jobs:
+        jfile = get_job_file(job_id)
+        if os.path.exists(jfile):
+            with open(jfile, "r", encoding="utf-8") as f:
+                jobs[job_id] = json.load(f)
+        else:
+            return jsonify({"error": "Video not found"}), 404
+
+    job = jobs[job_id]
+    if "temporal_events" not in job:
+        vpath = job.get("video_path")
+        segs = job.get("segments", [])
+        dur = job.get("video_info", {}).get("duration", 0.0)
+        t_res = detect_temporal_events(vpath, segs, dur)
+        job["temporal_events"] = t_res.get("events", [])
+        save_job(job_id, job)
+
+    return jsonify({
+        "success": True,
+        "job_id": job_id,
+        "events": job.get("temporal_events", []),
+        "total_events": len(job.get("temporal_events", [])),
+        "model_type": "Bidirectional LSTM (BiLSTM)"
+    })
+
+@app.route("/api/video/<job_id>/anomalies", methods=["GET"])
+def get_anomalies_endpoint(job_id):
+    if job_id not in jobs:
+        jfile = get_job_file(job_id)
+        if os.path.exists(jfile):
+            with open(jfile, "r", encoding="utf-8") as f:
+                jobs[job_id] = json.load(f)
+        else:
+            return jsonify({"error": "Video not found"}), 404
+
+    job = jobs[job_id]
+    if "anomalies" not in job:
+        vpath = job.get("video_path")
+        segs = job.get("segments", [])
+        dur = job.get("video_info", {}).get("duration", 0.0)
+        a_res = detect_anomalies(vpath, segs, dur)
+        job["anomalies"] = a_res.get("anomalies", [])
+        job["anomaly_timeline"] = a_res.get("timeline", [])
+        job["anomaly_summary"] = a_res.get("summary", {})
+        save_job(job_id, job)
+
+    return jsonify({
+        "success": True,
+        "job_id": job_id,
+        "anomalies": job.get("anomalies", []),
+        "timeline": job.get("anomaly_timeline", []),
+        "summary": job.get("anomaly_summary", {}),
+        "model_type": "Dense Autoencoder (Bottleneck Latent Reconstructor)"
+    })
+
+@app.route("/api/video/<job_id>/temporal-qa", methods=["POST"])
+def temporal_qa_endpoint(job_id):
+    data = request.get_json() or {}
+    question = data.get("question", "").strip()
+
+    if not job_id:
+        return jsonify({"error": "Valid job_id required"}), 400
+    if job_id not in jobs:
+        jfile = get_job_file(job_id)
+        if os.path.exists(jfile):
+            with open(jfile, "r", encoding="utf-8") as f:
+                jobs[job_id] = json.load(f)
+        else:
+            return jsonify({"error": "Video not found"}), 404
+    if not question:
+        return jsonify({"error": "Question required"}), 400
+
+    job = jobs[job_id]
+    events = job.get("temporal_events", [])
+    if not events:
+        vpath = job.get("video_path")
+        segs = job.get("segments", [])
+        dur = job.get("video_info", {}).get("duration", 0.0)
+        t_res = detect_temporal_events(vpath, segs, dur)
+        events = t_res.get("events", [])
+        job["temporal_events"] = events
+        save_job(job_id, job)
+
+    ans = answer_temporal_question(question, events, job.get("segments", []), job.get("chapters", []))
+    qa_id = learning_db.save_qa_history(
+        video_id=job_id,
+        question=question,
+        answer=ans.get("answer", ""),
+        source_timestamp=ans.get("timestamp", 0),
+        source_time_fmt=ans.get("timestamp_formatted", "00:00")
+    )
+    ans["qa_id"] = qa_id
+    ans["success"] = True
+    ans["job_id"] = job_id
+    return jsonify(ans)
+
+@app.route("/api/quiz/temporal/<job_id>", methods=["GET"])
+def get_temporal_quiz_endpoint(job_id):
+    if job_id not in jobs:
+        jfile = get_job_file(job_id)
+        if os.path.exists(jfile):
+            with open(jfile, "r", encoding="utf-8") as f:
+                jobs[job_id] = json.load(f)
+        else:
+            return jsonify({"error": "Video not found"}), 404
+
+    job = jobs[job_id]
+    events = job.get("temporal_events", [])
+    if not events:
+        vpath = job.get("video_path")
+        segs = job.get("segments", [])
+        dur = job.get("video_info", {}).get("duration", 0.0)
+        t_res = detect_temporal_events(vpath, segs, dur)
+        events = t_res.get("events", [])
+        job["temporal_events"] = events
+        save_job(job_id, job)
+
+    quiz = generate_temporal_events_quiz(job_id, events, count=5)
+    return jsonify({
+        "success": True,
+        "job_id": job_id,
+        "quiz": quiz
+    })
 
 # ================= LEARNING SUITE: Q&A ENHANCEMENTS ================= #
 
