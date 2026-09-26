@@ -189,10 +189,17 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
             speed_mb = round(speed / (1024 * 1024), 1) if speed else 0
             progress_callback(pct, speed_mb)
 
-    # 1. Quick probe of video duration
-    duration = 0
-    title = 'Downloaded Lecture'
-    cookie_opts = _get_cookie_opts()
+    # 1. Verify cookies file exists
+    COOKIES_FILE = "/etc/secrets/cookies.txt"
+    if not os.path.exists(COOKIES_FILE):
+        # Fallback: try dynamic cookie resolution
+        COOKIES_FILE = _get_cookie_file()
+        if not COOKIES_FILE:
+            raise RuntimeError(
+                "YouTube cookies file not found at /etc/secrets/cookies.txt. "
+                "Please add it as a Secret File in your Render dashboard."
+            )
+    logger.info("YouTube cookies found at: %s", COOKIES_FILE)
 
     # Extended player client list — tv_embedded bypasses consent/reload gate on server IPs
     _EXTRACTOR_ARGS = {
@@ -201,41 +208,43 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         }
     }
 
+    # 2. Quick probe of video duration
+    duration = 0
+    title = 'Downloaded Lecture'
     try:
         probe_opts = {
             'quiet': True,
             'no_warnings': True,
             'noplaylist': True,
+            'cookiefile': COOKIES_FILE,
             'http_headers': {'User-Agent': _USER_AGENT},
             'extractor_args': _EXTRACTOR_ARGS,
-            **cookie_opts,
         }
-
         with yt_dlp.YoutubeDL(probe_opts) as probe_ydl:
             meta = probe_ydl.extract_info(url, download=False)
             if meta:
                 duration = meta.get('duration', 0) or 0
                 title = meta.get('title', 'Downloaded Lecture')
     except Exception as e:
-        logger.warning(f"Probe extract_info failed: {e}. Falling back to default format selector.")
-
+        logger.warning(f"Probe extract_info failed: {e}. Proceeding with download anyway.")
 
     ydl_opts = {
-        'ffmpeg_location': ffmpeg_exe,
-        'format': 'best',
-        'outtmpl': out_template,
+        'cookiefile': COOKIES_FILE,
+        'format': 'bestvideo*+bestaudio/best',
         'merge_output_format': 'mp4',
-        'progress_hooks': [yt_hook],
-        'quiet': True,
-        'no_warnings': True,
         'noplaylist': True,
+        'quiet': True,
+        'no_warnings': False,
+        'ffmpeg_location': ffmpeg_exe,
+        'outtmpl': out_template,
+        'progress_hooks': [yt_hook],
         'max_filesize': MAX_ALLOWED_SIZE_BYTES,
         'http_headers': {'User-Agent': _USER_AGENT},
         'extractor_args': _EXTRACTOR_ARGS,
         'sleep_interval': 2,
         'max_sleep_interval': 5,
-        **cookie_opts,
     }
+
 
 
     try:
