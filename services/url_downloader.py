@@ -290,14 +290,23 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
                 if not f.endswith((".part", ".ytdl")) and os.path.isfile(f)
             ]
 
+            logger.info("Files created by yt-dlp:")
+            for f in files:
+                size_mb = os.path.getsize(f) / (1024 * 1024)
+                logger.info(f"  {f} ({size_mb:.2f} MB)")
+
             if not files:
+                logger.error("Directory contents:")
+                for f in os.listdir(output_dir):
+                    logger.error(f"  {repr(f)}")
                 raise RuntimeError(
-                    "yt-dlp finished but no downloaded video file was found. "
-                    "This usually means the download was aborted (e.g. file size exceeded 480MB limit)."
+                    "yt-dlp completed but no downloaded video file was found."
                 )
 
             # Select the largest media file
             filepath = max(files, key=os.path.getsize)
+            final_size = os.path.getsize(filepath) / (1024 * 1024)
+            logger.info(f"Final downloaded file: {filepath} ({final_size:.2f} MB)")
 
 
     except Exception as e:
