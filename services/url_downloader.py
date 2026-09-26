@@ -158,211 +158,134 @@ def _get_cookie_opts():
 
 
 def download_video_from_url(url, output_dir, job_id, progress_callback=None):
-    """
-    Downloads video from YouTube, Vimeo, or direct video URL using yt-dlp.
-    Guarantees the downloaded video is strictly under 500 MB and uses
-    efficient formats (360p/480p/720p) to keep RAM, disk, and CPU load minimal.
-    """
     os.makedirs(output_dir, exist_ok=True)
-    out_template = os.path.join(output_dir, f"{job_id}_%(id)s.%(ext)s")
-    
-    # Ensure FFmpeg and Deno are in PATH
-    ffmpeg_exe = get_ffmpeg_path()
-    ffmpeg_dir = os.path.dirname(ffmpeg_exe)
-    deno_dirs = [
-        os.path.expanduser("~/.deno/bin"),
-        os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".deno", "bin")),
-        "/root/.deno/bin",
-        "/opt/render/.deno/bin"
-    ]
-    curr_path = os.environ.get("PATH", "")
-    new_paths = [d for d in [ffmpeg_dir] + deno_dirs if os.path.exists(d) and d not in curr_path]
-    if new_paths:
-        os.environ["PATH"] = f"{':'.join(new_paths)}:{curr_path}"
 
-    def yt_hook(d):
-        if progress_callback and d.get('status') == 'downloading':
-            total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
-            downloaded = d.get('downloaded_bytes') or 0
-            pct = round((downloaded / total) * 100, 1) if total > 0 else 0
-            speed = d.get('speed') or 0
-            speed_mb = round(speed / (1024 * 1024), 1) if speed else 0
-            progress_callback(pct, speed_mb)
+    output_template = os.path.join(
+        output_dir,
+        f"{job_id}.%(ext)s"
+    )
 
-    # 1. Verify cookies file and copy to writable /tmp location
-    # Render mounts /etc/secrets/* as READ-ONLY — yt-dlp must not write back to it
-    SOURCE_COOKIES = "/etc/secrets/cookies.txt"
-    WRITABLE_COOKIES = "/tmp/vidseek_cookies.txt"
-
-    if os.path.exists(SOURCE_COOKIES):
-        shutil.copyfile(SOURCE_COOKIES, WRITABLE_COOKIES)
-        logger.info("Copied Render secret cookies -> %s", WRITABLE_COOKIES)
-    else:
-        # Fallback: try dynamic cookie resolution (local dev / env var)
-        fallback = _get_cookie_file()
-        if fallback:
-            shutil.copyfile(fallback, WRITABLE_COOKIES)
-            logger.info("Copied fallback cookies %s -> %s", fallback, WRITABLE_COOKIES)
-        else:
-            raise RuntimeError(
-                "YouTube cookies file not found at /etc/secrets/cookies.txt. "
-                "Please add it as a Secret File in your Render dashboard."
-            )
-
-    logger.info("YouTube cookies ready at: %s", WRITABLE_COOKIES)
-
-    # Extended player client list — tv_embedded bypasses consent/reload gate on server IPs
-    _EXTRACTOR_ARGS = {
-        'youtube': {
-            'player_client': ['tv_embedded', 'android', 'ios', 'mweb', 'web'],
-        }
-    }
-
-    # 2. Quick probe of video duration
-    duration = 0
-    title = 'Downloaded Lecture'
-    try:
-        probe_opts = {
-            'quiet': True,
-            'no_warnings': True,
-            'noplaylist': True,
-            'cookiefile': WRITABLE_COOKIES,
-            'cachedir': '/tmp/yt-dlp-cache',
-            'http_headers': {'User-Agent': _USER_AGENT},
-            'extractor_args': _EXTRACTOR_ARGS,
-        }
-        with yt_dlp.YoutubeDL(probe_opts) as probe_ydl:
-            meta = probe_ydl.extract_info(url, download=False)
-            if meta:
-                duration = meta.get('duration', 0) or 0
-                title = meta.get('title', 'Downloaded Lecture')
-    except Exception as e:
-        logger.warning(f"Probe extract_info failed: {e}. Proceeding with download anyway.")
-
-    # 3. Dynamic format selector to stay under 480MB limit
-    if duration > 3600:  # > 1 hour -> 360p max
-        format_spec = 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best[height<=360]'
-    elif duration > 1800:  # > 30 mins -> 480p max
-        format_spec = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best[height<=480]'
-    else:
-        format_spec = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]'
+    print("=" * 70)
+    print("YT-DLP DOWNLOAD START")
+    print("URL:", url)
+    print("DIRECTORY:", output_dir)
+    print("OUTPUT TEMPLATE:", output_template)
+    print("=" * 70)
 
     ydl_opts = {
-        'cookiefile': WRITABLE_COOKIES,
-        'cachedir': '/tmp/yt-dlp-cache',
-        'format': format_spec,
-        'merge_output_format': 'mp4',
-        'noplaylist': True,
-        'quiet': False,
-        'no_warnings': False,
-        'verbose': True,
-        'listformats': True,
-        'retries': 5,
-        'fragment_retries': 5,
-        'continuedl': True,
-        'ffmpeg_location': ffmpeg_exe,
-        'outtmpl': out_template,
-        'progress_hooks': [yt_hook],
-        'max_filesize': MAX_ALLOWED_SIZE_BYTES,
-        'http_headers': {'User-Agent': _USER_AGENT},
-        'extractor_args': _EXTRACTOR_ARGS,
-        'sleep_interval': 2,
-        'max_sleep_interval': 5,
+        "outtmpl": output_template,
+
+        # Start simple: don't force video+audio merging yet.
+        "format": "best[height<=480]/best",
+
+        "noplaylist": True,
+
+        "quiet": False,
+        "no_warnings": False,
+
+        "retries": 3,
+        "fragment_retries": 3,
+
+        "continuedl": True,
+
+        # Don't abort because of your application's size assumption.
+        "nopart": False,
+        
+        # Keep our cookie configuration to avoid bot blocks
+        "cookiefile": "/tmp/vidseek_cookies.txt" if os.path.exists("/tmp/vidseek_cookies.txt") else None,
+        "cachedir": "/tmp/yt-dlp-cache",
+        "http_headers": {'User-Agent': _USER_AGENT},
     }
+
+    # Fetch cookies to writable tmp
+    if os.path.exists("/etc/secrets/cookies.txt"):
+        shutil.copyfile("/etc/secrets/cookies.txt", "/tmp/vidseek_cookies.txt")
+        ydl_opts["cookiefile"] = "/tmp/vidseek_cookies.txt"
+
+    title = "Video"
+    duration = 0
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            logger.info(f"Downloading video from URL: {url} (cookiefile: {WRITABLE_COOKIES})")
-
             info = ydl.extract_info(url, download=True)
-            title = info.get('title', title)
-            duration = info.get('duration', duration)
             
-            # Robust file discovery using glob
-            import glob
-            files = []
-            for pattern in [os.path.join(output_dir, f"{job_id}_*")]:
-                files.extend(glob.glob(pattern))
+            title = info.get("title", title)
+            duration = info.get("duration", duration)
 
-            # Ignore temporary/partial files
-            files = [
-                f for f in files
-                if not f.endswith((".part", ".ytdl")) and os.path.isfile(f)
-            ]
-
-            logger.info("Files created by yt-dlp:")
-            for f in files:
-                size_mb = os.path.getsize(f) / (1024 * 1024)
-                logger.info(f"  {f} ({size_mb:.2f} MB)")
-
-            if not files:
-                logger.error("Directory contents:")
-                for f in os.listdir(output_dir):
-                    logger.error(f"  {repr(f)}")
-                raise RuntimeError(
-                    "yt-dlp completed but no downloaded video file was found."
-                )
-
-            # Select the largest media file
-            filepath = max(files, key=os.path.getsize)
-            final_size = os.path.getsize(filepath) / (1024 * 1024)
-            logger.info(f"Final downloaded file: {filepath} ({final_size:.2f} MB)")
-
+            print("\nYT-DLP INFO")
+            print("ID:", info.get("id"))
+            print("TITLE:", title)
+            print("EXT:", info.get("ext"))
+            print("FORMAT:", info.get("format"))
+            print("SIZE:", info.get("filesize"))
+            print("REQUESTED DOWNLOADS:", info.get("requested_downloads"))
 
     except Exception as e:
-        err_msg = str(e)
-        if "Sign in to confirm you’re not a bot" in err_msg or "Sign in to confirm you're not a bot" in err_msg:
-            raise RuntimeError(
-                "YouTube bot detection triggered on server. "
-                "Please configure YouTube cookies on Render by uploading /etc/secrets/cookies.txt "
-                "or setting the 'YOUTUBE_COOKIES_TEXT' environment variable."
-            ) from e
-        elif "The page needs to be reloaded" in err_msg or "needs to be reloaded" in err_msg:
-            raise RuntimeError(
-                "YouTube returned a consent/reload page — the server IP may be temporarily flagged. "
-                "Providing fresh YouTube cookies via the 'YOUTUBE_COOKIES_TEXT' environment variable "
-                "will resolve this. Export cookies using the 'Get cookies.txt LOCALLY' browser extension."
-            ) from e
-        elif "Requested format is not available" in err_msg:
-            raise RuntimeError(
-                "YouTube format extraction failed. Make sure valid YouTube cookies are provided "
-                "under /etc/secrets/cookies.txt in the Render dashboard."
-            ) from e
-        raise
+        print("\nYT-DLP EXCEPTION:")
+        print(repr(e))
+        raise RuntimeError(
+            f"yt-dlp download failed: {e}"
+        ) from e
 
-    # 3. Post-download verification: ensure strict < 500 MB constraint
-    if os.path.exists(filepath):
-        actual_size = os.path.getsize(filepath)
-        if actual_size > MAX_ALLOWED_SIZE_BYTES:
-            logger.warning(f"Downloaded file {filepath} ({actual_size / (1024*1024):.1f}MB) exceeds 480MB. Compressing with FFmpeg...")
-            compressed_path = os.path.join(output_dir, f"{job_id}_compact.mp4")
-            dur = max(1.0, float(duration or 3600))
-            # Target 380MB max to stay well under 500MB
-            target_bitrate_kbps = max(120, int((380 * 8192) / dur))
-            video_bitrate = max(90, target_bitrate_kbps - 48)
+    print("\nFILES AFTER DOWNLOAD:")
 
-            compress_cmd = [
-                ffmpeg_exe, "-y",
-                "-i", filepath,
-                "-vf", "scale=-2:'min(360,ih)'",
-                "-c:v", "libx264",
-                "-b:v", f"{video_bitrate}k",
-                "-preset", "veryfast",
-                "-c:a", "aac",
-                "-b:a", "48k",
-                compressed_path
-            ]
-            res = subprocess.run(compress_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-            if res.returncode == 0 and os.path.exists(compressed_path) and os.path.getsize(compressed_path) > 0:
-                os.remove(filepath)
-                os.rename(compressed_path, filepath)
-                logger.info(f"Compressed file successfully to {os.path.getsize(filepath)/(1024*1024):.1f}MB")
+    all_files = []
+
+    for root, dirs, files in os.walk(output_dir):
+        for filename in files:
+            full_path = os.path.join(root, filename)
+
+            try:
+                size = os.path.getsize(full_path)
+            except OSError:
+                size = 0
+
+            print(
+                f"FILE: {repr(full_path)} | "
+                f"SIZE: {size / (1024 * 1024):.2f} MB"
+            )
+
+            all_files.append(full_path)
+
+    print("=" * 70)
+
+    # Ignore temporary files
+    import glob
+    media_files = [
+        f for f in all_files
+        if not f.endswith(".part")
+        and not f.endswith(".ytdl")
+        and not f.endswith(".json")
+        and os.path.basename(f).startswith(job_id)
+    ]
+
+    if not media_files:
+        raise RuntimeError(
+            "yt-dlp completed, but no final media file exists. "
+            "Check the Render logs above for the actual yt-dlp output."
+        )
+
+    downloaded_file = max(
+        media_files,
+        key=os.path.getsize
+    )
+
+    size_mb = os.path.getsize(downloaded_file) / (1024 * 1024)
+    print("SELECTED FILE:", downloaded_file)
+    print(f"Final file size: {size_mb:.2f} MB")
+    
+    if size_mb > 480:
+        os.remove(downloaded_file)
+        raise RuntimeError(
+            f"Downloaded video is {size_mb:.1f} MB, "
+            "which exceeds the 480 MB limit."
+        )
 
     return {
         "title": title,
-        "filepath": filepath,
+        "filepath": downloaded_file,
         "duration": duration,
-        "filename": os.path.basename(filepath)
+        "filename": os.path.basename(downloaded_file)
     }
 
 if __name__ == "__main__":
