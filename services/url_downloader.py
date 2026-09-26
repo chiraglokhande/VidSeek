@@ -236,6 +236,9 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
             if meta:
                 duration = meta.get('duration', 0) or 0
                 title = meta.get('title', 'Downloaded Lecture')
+    except Exception as e:
+        logger.warning(f"Probe extract_info failed: {e}. Proceeding with download anyway.")
+
     # 3. Dynamic format selector to stay under 480MB limit
     if duration > 3600:  # > 1 hour -> 360p max
         format_spec = 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best[height<=360]'
