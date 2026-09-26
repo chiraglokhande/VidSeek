@@ -194,16 +194,22 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     title = 'Downloaded Lecture'
     cookie_opts = _get_cookie_opts()
 
+    # Extended player client list — tv_embedded bypasses consent/reload gate on server IPs
+    _EXTRACTOR_ARGS = {
+        'youtube': {
+            'player_client': ['tv_embedded', 'android', 'ios', 'mweb', 'web'],
+        }
+    }
+
     try:
         probe_opts = {
             'quiet': True,
             'no_warnings': True,
             'noplaylist': True,
             'http_headers': {'User-Agent': _USER_AGENT},
+            'extractor_args': _EXTRACTOR_ARGS,
             **cookie_opts,
         }
-        if not cookie_opts:
-            probe_opts['extractor_args'] = {'youtube': {'player_client': ['android', 'ios']}}
 
         with yt_dlp.YoutubeDL(probe_opts) as probe_ydl:
             meta = probe_ydl.extract_info(url, download=False)
@@ -239,10 +245,11 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         'noplaylist': True,
         'max_filesize': MAX_ALLOWED_SIZE_BYTES,
         'http_headers': {'User-Agent': _USER_AGENT},
+        'extractor_args': _EXTRACTOR_ARGS,
+        'sleep_interval': 2,
+        'max_sleep_interval': 5,
         **cookie_opts,
     }
-    if not cookie_opts:
-        ydl_opts['extractor_args'] = {'youtube': {'player_client': ['android', 'ios']}}
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -268,6 +275,12 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
                 "YouTube bot detection triggered on server. "
                 "Please configure YouTube cookies on Render by uploading /etc/secrets/cookies.txt "
                 "or setting the 'YOUTUBE_COOKIES_TEXT' environment variable."
+            ) from e
+        elif "The page needs to be reloaded" in err_msg or "needs to be reloaded" in err_msg:
+            raise RuntimeError(
+                "YouTube returned a consent/reload page — the server IP may be temporarily flagged. "
+                "Providing fresh YouTube cookies via the 'YOUTUBE_COOKIES_TEXT' environment variable "
+                "will resolve this. Export cookies using the 'Get cookies.txt LOCALLY' browser extension."
             ) from e
         elif "Requested format is not available" in err_msg:
             raise RuntimeError(
