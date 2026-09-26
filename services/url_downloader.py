@@ -202,30 +202,66 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         shutil.copyfile("/etc/secrets/cookies.txt", "/tmp/vidseek_cookies.txt")
         ydl_opts["cookiefile"] = "/tmp/vidseek_cookies.txt"
 
+    # Try clients from least complicated to more restricted.
+    clients = [
+        "web_embedded",
+        "tv_embedded",
+        "android_vr",
+        "ios",
+        "web",
+    ]
+
+    errors = []
     title = "Video"
     duration = 0
+    info_extracted = False
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
+    for client in clients:
+        ydl_opts["extractor_args"] = {
+            "youtube": {
+                "player_client": [client]
+            }
+        }
+        
+        print(f"\n--- Trying YouTube client: {client} ---")
+        
+        # Clean up any partial files from previous attempts
+        import glob
+        for f in glob.glob(os.path.join(output_dir, f"{job_id}.*")):
+            try:
+                os.remove(f)
+            except OSError:
+                pass
+                
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                
+                title = info.get("title", title)
+                duration = info.get("duration", duration)
+
+                print("\nYT-DLP INFO")
+                print("ID:", info.get("id"))
+                print("TITLE:", title)
+                print("EXT:", info.get("ext"))
+                print("FORMAT:", info.get("format"))
+                print("SIZE:", info.get("filesize"))
+                print("REQUESTED DOWNLOADS:", info.get("requested_downloads"))
+                
+                info_extracted = True
+                break # Success! Break out of the fallback loop
+
+        except Exception as e:
+            err_msg = str(e)
+            print(f"Client {client} failed: {err_msg}")
+            errors.append(f"{client}: {err_msg}")
             
-            title = info.get("title", title)
-            duration = info.get("duration", duration)
-
-            print("\nYT-DLP INFO")
-            print("ID:", info.get("id"))
-            print("TITLE:", title)
-            print("EXT:", info.get("ext"))
-            print("FORMAT:", info.get("format"))
-            print("SIZE:", info.get("filesize"))
-            print("REQUESTED DOWNLOADS:", info.get("requested_downloads"))
-
-    except Exception as e:
-        print("\nYT-DLP EXCEPTION:")
-        print(repr(e))
+    if not info_extracted:
+        print("\nYT-DLP EXCEPTION: All clients failed")
         raise RuntimeError(
-            f"yt-dlp download failed: {e}"
-        ) from e
+            "Unable to download YouTube video. Bot detection may be blocking the server.\n" + 
+            "\n".join(errors)
+        )
 
     print("\nFILES AFTER DOWNLOAD:")
 
