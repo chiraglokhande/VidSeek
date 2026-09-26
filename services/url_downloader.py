@@ -24,12 +24,15 @@ _USER_AGENT = (
     "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 )
 
-# Mobile player clients bypass YouTube's web bot-check on cloud/datacenter IPs (Render, Railway, etc.)
-_EXTRACTOR_ARGS = {
-    'youtube': {
-        'player_client': ['ios', 'android', 'mweb']
-    }
-}
+def _get_extractor_args(has_cookies):
+    """
+    Select optimal YouTube player clients based on whether cookies are present.
+    If authenticated cookies are available, web client provides high quality and all formats.
+    If unauthenticated, mobile clients (android, ios) bypass cloud IP bot checks.
+    """
+    if has_cookies:
+        return {'youtube': {'player_client': ['web', 'android', 'ios']}}
+    return {'youtube': {'player_client': ['android', 'ios', 'web']}}
 
 
 def _get_cookie_opts():
@@ -133,7 +136,7 @@ def _get_cookie_opts():
                 'no_warnings': True,
                 'cookiesfrombrowser': (browser,),
                 'skip_download': True,
-                'extractor_args': _EXTRACTOR_ARGS,
+                'extractor_args': {'youtube': {'player_client': ['web', 'android']}},
             }
             with yt_dlp.YoutubeDL(test_opts) as ydl:
                 ydl.extract_info("https://www.youtube.com/watch?v=BaW_jenozKc", download=False)
@@ -156,12 +159,20 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     """
     os.makedirs(output_dir, exist_ok=True)
     out_template = os.path.join(output_dir, f"{job_id}_%(title).50s.%(ext)s")
+    
+    # Ensure FFmpeg and Deno are in PATH
     ffmpeg_exe = get_ffmpeg_path()
     ffmpeg_dir = os.path.dirname(ffmpeg_exe)
-
-    # Ensure ffmpeg dir is in PATH for any external subprocess
-    if ffmpeg_dir not in os.environ.get("PATH", ""):
-        os.environ["PATH"] = f"{ffmpeg_dir}:{os.environ.get('PATH', '')}"
+    deno_dirs = [
+        os.path.expanduser("~/.deno/bin"),
+        os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".deno", "bin")),
+        "/root/.deno/bin",
+        "/opt/render/.deno/bin"
+    ]
+    curr_path = os.environ.get("PATH", "")
+    new_paths = [d for d in [ffmpeg_dir] + deno_dirs if os.path.exists(d) and d not in curr_path]
+    if new_paths:
+        os.environ["PATH"] = f"{':'.join(new_paths)}:{curr_path}"
 
     def yt_hook(d):
         if progress_callback and d.get('status') == 'downloading':
@@ -176,12 +187,14 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     duration = 0
     title = 'Downloaded Lecture'
     cookie_opts = _get_cookie_opts()
+    extractor_args = _get_extractor_args(has_cookies=bool(cookie_opts))
+
     try:
         probe_opts = {
             'quiet': True,
             'no_warnings': True,
             'noplaylist': True,
-            'extractor_args': _EXTRACTOR_ARGS,
+            'extractor_args': extractor_args,
             'http_headers': {'User-Agent': _USER_AGENT},
             **cookie_opts,
         }
@@ -193,23 +206,21 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     except Exception as e:
         logger.warning(f"Probe extract_info failed: {e}. Falling back to default format selector.")
 
-    # 2. Format selector for low quality (<500MB guaranteed, minimal memory & disk footprint)
-    # If video is long (> 3 hours = 10800s), target 240p/360p; otherwise 360p/480p
+    # 2. Resilient format selector for low quality (<500MB, robust fallbacks)
     if duration > 10800:
         format_spec = (
-            'bestvideo[height<=360][filesize_approx<=400M]+bestaudio[filesize_approx<=50M]/'
-            'bestvideo[height<=360]+bestaudio/'
-            'best[height<=360]/'
-            'worstvideo+worstaudio/worst'
+            'b[height<=360][filesize_approx<=400M]/bv*[height<=360]+ba/'
+            'b[height<=360]/'
+            '18/'
+            'worst[ext=mp4]/b/worst'
         )
     else:
         format_spec = (
-            'bestvideo[height<=480][filesize_approx<=400M]+bestaudio[filesize_approx<=60M]/'
-            'bestvideo[height<=360]+bestaudio/'
-            'best[height<=360]/'
-            'best[height<=480][filesize<=480M]/'
-            'bestvideo[filesize_approx<=420M]+bestaudio/'
-            'worstvideo+worstaudio/worst'
+            'b[height<=480][filesize_approx<=420M]/bv*[height<=480]+ba/'
+            'b[height<=360]/bv*[height<=360]+ba/'
+            'b[height<=720][filesize_approx<=450M]/bv*[height<=720]+ba/'
+            '18/'
+            'worst[ext=mp4]/b/worst'
         )
 
     ydl_opts = {
@@ -222,7 +233,7 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         'no_warnings': True,
         'noplaylist': True,
         'max_filesize': MAX_ALLOWED_SIZE_BYTES,
-        'extractor_args': _EXTRACTOR_ARGS,
+        'extractor_args': extractor_args,
         'http_headers': {'User-Agent': _USER_AGENT},
         **cookie_opts,
     }
@@ -246,11 +257,16 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
                 filepath = candidates[0] if candidates else filename
     except Exception as e:
         err_msg = str(e)
-        if "Sign in to confirm you’re not a bot" in err_msg or "Sign in to confirm you're not a bot" in err_msg or "bot" in err_msg.lower():
+        if "Sign in to confirm you’re not a bot" in err_msg or "Sign in to confirm you're not a bot" in err_msg:
             raise RuntimeError(
                 "YouTube bot detection triggered on server. "
                 "Please configure YouTube cookies on Render by setting the 'YOUTUBE_COOKIES_TEXT' environment variable "
                 "or uploading /etc/secrets/cookies.txt in the Render dashboard."
+            ) from e
+        elif "Requested format is not available" in err_msg:
+            raise RuntimeError(
+                "YouTube format extraction failed. Make sure valid YouTube cookies are provided "
+                "in Render environment variables (YOUTUBE_COOKIES_TEXT) or under Secret Files (/etc/secrets/cookies.txt)."
             ) from e
         raise
 
