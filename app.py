@@ -266,8 +266,23 @@ def upload_video():
     if not file.filename:
         return jsonify({"error": "Empty filename"}), 400
 
+    original_filename = file.filename
+    ext = os.path.splitext(original_filename)[1].lower()
+    allowed_extensions = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"}
+    
+    if ext not in allowed_extensions:
+        return jsonify({"error": f"Unsupported video format: {ext}"}), 400
+
+    import unicodedata
+    import re
+    
+    base = os.path.splitext(original_filename)[0]
+    base = unicodedata.normalize("NFKC", base)
+    base = re.sub(r"[^A-Za-z0-9._-]", "_", base)
+    base = re.sub(r"_+", "_", base).strip("_")
+
     job_id = str(uuid.uuid4())[:8]
-    filename = f"{job_id}_{file.filename}"
+    filename = f"{job_id}_{base}{ext}"
     saved_path = os.path.join(UPLOAD_DIR, filename)
     file.save(saved_path)
 

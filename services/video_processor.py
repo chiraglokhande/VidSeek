@@ -30,10 +30,12 @@ def parse_timestamp(timestamp_str):
 def get_video_info(video_path):
     """Extract metadata including duration, resolution, size using ffmpeg output."""
     ffmpeg_exe = get_ffmpeg_path()
-    cmd = [ffmpeg_exe, "-i", video_path]
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    _, stderr = process.communicate()
-    output = stderr.decode('utf-8', errors='ignore')
+    cmd = [ffmpeg_exe, "-hide_banner", "-i", video_path]
+    process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    output = process.stderr
+    
+    if "Invalid data found when processing input" in output or "No such file or directory" in output:
+        raise ValueError(f"FFmpeg probe failed. File may be corrupted, incomplete, or not a video:\n{output[-1000:]}")
 
     duration = 0.0
     dur_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", output)
@@ -66,6 +68,8 @@ def extract_audio(video_path, output_audio_path):
     
     cmd = [
         ffmpeg_exe, "-y",
+        "-hide_banner",
+        "-loglevel", "error",
         "-i", video_path,
         "-vn",
         "-acodec", "pcm_s16le",
@@ -73,7 +77,14 @@ def extract_audio(video_path, output_audio_path):
         "-ac", "1",
         output_audio_path
     ]
-    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    result = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Audio extraction failed with code {result.returncode}:\n{result.stderr[-2000:]}")
     return output_audio_path
 
 def extract_thumbnail(video_path, output_image_path, timestamp_sec=2.0):
@@ -121,6 +132,7 @@ def split_video_chapter(video_path, start_sec, end_sec, output_chapter_path):
     # Fallback to veryfast re-encode only if stream copy wasn't viable
     fallback_cmd = [
         ffmpeg_exe, "-y",
+        "-hide_banner",
         "-ss", str(max(0.0, start_sec)),
         "-i", video_path,
         "-t", str(duration),
@@ -132,7 +144,14 @@ def split_video_chapter(video_path, start_sec, end_sec, output_chapter_path):
         "-movflags", "+faststart",
         output_chapter_path
     ]
-    subprocess.run(fallback_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    result = subprocess.run(
+        fallback_cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"FFmpeg split fallback failed with code {result.returncode}:\n{result.stderr[-2000:]}")
     return output_chapter_path
 
 def generate_all_chapter_videos(video_path, chapters, output_dir, job_id):
