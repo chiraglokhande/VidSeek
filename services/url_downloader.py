@@ -236,16 +236,13 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
             if meta:
                 duration = meta.get('duration', 0) or 0
                 title = meta.get('title', 'Downloaded Lecture')
-    except Exception as e:
-        logger.warning(f"Probe extract_info failed: {e}. Proceeding with download anyway.")
-
     # 3. Dynamic format selector to stay under 480MB limit
     if duration > 3600:  # > 1 hour -> 360p max
-        format_spec = 'bestvideo[height<=360]+bestaudio/best'
+        format_spec = 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best[height<=360]'
     elif duration > 1800:  # > 30 mins -> 480p max
-        format_spec = 'bestvideo[height<=480]+bestaudio/best'
+        format_spec = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best[height<=480]'
     else:
-        format_spec = 'bestvideo[height<=720]+bestaudio/best'
+        format_spec = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]'
 
     ydl_opts = {
         'cookiefile': WRITABLE_COOKIES,
@@ -259,6 +256,7 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         'listformats': True,
         'retries': 5,
         'fragment_retries': 5,
+        'continuedl': True,
         'ffmpeg_location': ffmpeg_exe,
         'outtmpl': out_template,
         'progress_hooks': [yt_hook],
@@ -276,23 +274,28 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
             info = ydl.extract_info(url, download=True)
             title = info.get('title', title)
             duration = info.get('duration', duration)
-            filename = ydl.prepare_filename(info)
             
-            # Ensure mp4 extension if merged
-            base, _ = os.path.splitext(filename)
-            if os.path.exists(base + ".mp4"):
-                filepath = base + ".mp4"
-            elif os.path.exists(filename):
-                filepath = filename
-            else:
-                candidates = [os.path.join(output_dir, f) for f in os.listdir(output_dir) if f.startswith(job_id)]
-                filepath = candidates[0] if candidates else filename
-                
-            if not os.path.exists(filepath):
+            # Robust file discovery using glob
+            import glob
+            files = []
+            for pattern in [os.path.join(output_dir, f"{job_id}_*")]:
+                files.extend(glob.glob(pattern))
+
+            # Ignore temporary/partial files
+            files = [
+                f for f in files
+                if not f.endswith((".part", ".ytdl")) and os.path.isfile(f)
+            ]
+
+            if not files:
                 raise RuntimeError(
-                    f"yt-dlp finished but output file was not found. "
-                    f"This usually happens if the video exceeds the 480MB limit. URL: {url}"
+                    "yt-dlp finished but no downloaded video file was found. "
+                    "This usually means the download was aborted (e.g. file size exceeded 480MB limit)."
                 )
+
+            # Select the largest media file
+            filepath = max(files, key=os.path.getsize)
+
 
     except Exception as e:
         err_msg = str(e)
