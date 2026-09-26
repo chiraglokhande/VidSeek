@@ -239,10 +239,18 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     except Exception as e:
         logger.warning(f"Probe extract_info failed: {e}. Proceeding with download anyway.")
 
+    # 3. Dynamic format selector to stay under 480MB limit
+    if duration > 3600:  # > 1 hour -> 360p max
+        format_spec = 'bestvideo[height<=360]+bestaudio/best'
+    elif duration > 1800:  # > 30 mins -> 480p max
+        format_spec = 'bestvideo[height<=480]+bestaudio/best'
+    else:
+        format_spec = 'bestvideo[height<=720]+bestaudio/best'
+
     ydl_opts = {
         'cookiefile': WRITABLE_COOKIES,
         'cachedir': '/tmp/yt-dlp-cache',
-        'format': 'bestvideo[height<=720]+bestaudio/best',
+        'format': format_spec,
         'merge_output_format': 'mp4',
         'noplaylist': True,
         'quiet': False,
