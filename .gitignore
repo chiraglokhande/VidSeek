@@ -62,4 +62,3 @@ sample_data/test_run/
 
 # YouTube cookies (sensitive auth tokens — never commit)
 cookies.txt
-requirements.txt
