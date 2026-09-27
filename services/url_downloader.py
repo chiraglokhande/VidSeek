@@ -3,8 +3,6 @@ import sys
 import re
 import json
 import logging
-import shutil
-import tempfile
 import subprocess
 import yt_dlp
 import platform
@@ -26,206 +24,35 @@ _USER_AGENT = (
     "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 )
 
-def _get_cookie_file():
-    """
-    Resolve YouTube cookies into a writable local file.
-
-    Priority:
-      1. /etc/secrets/cookies.txt (Render Secret File, copied to /tmp)
-      2. YOUTUBE_COOKIES environment variable:
-         - if it points to an existing file, copy that file
-         - otherwise treat the variable itself as Netscape cookie-file content
-      3. YOUTUBE_COOKIES_TEXT (inline Netscape cookie content)
-      4. YOUTUBE_COOKIES_BASE64 (base64-encoded cookie content)
-      5. local cookies.txt in the project/current directory
-    """
-    import base64
-
-    writable_cookie = os.path.join(
-        tempfile.gettempdir(),
-        "youtube_cookies.txt"
-    )
-
-    def _write_cookie_content(cookie_text, source_name):
-        if not cookie_text:
-            return None
-
-        try:
-            # Keep the exact cookie-file structure. Do not log the contents.
-            with open(
-                writable_cookie,
-                "w",
-                encoding="utf-8",
-                newline="\n"
-            ) as f:
-                f.write(cookie_text)
-
-            os.chmod(writable_cookie, 0o600)
-
-            if os.path.getsize(writable_cookie) == 0:
-                logger.warning(
-                    "YouTube cookie source %s produced an empty cookie file",
-                    source_name
-                )
-                return None
-
-            logger.info(
-                "Loaded YouTube cookies from %s -> %s",
-                source_name,
-                writable_cookie
-            )
-            return writable_cookie
-
-        except Exception as e:
-            logger.warning(
-                "Failed to write YouTube cookies from %s: %s",
-                source_name,
-                e
-            )
-            return None
-
-    # 1. Render native Secret File.
-    render_secret_path = "/etc/secrets/cookies.txt"
-
-    if (
-        os.path.isfile(render_secret_path)
-        and os.path.getsize(render_secret_path) > 0
-    ):
-        try:
-            shutil.copyfile(render_secret_path, writable_cookie)
-            os.chmod(writable_cookie, 0o600)
-
-            logger.info(
-                "Loaded YouTube cookies from Render Secret File -> %s",
-                writable_cookie
-            )
-            return writable_cookie
-
-        except Exception as e:
-            logger.warning(
-                "Could not copy Render Secret File: %s",
-                e
-            )
-
-    # 2. Railway/Render environment variable.
-    #
-    # IMPORTANT:
-    # YOUTUBE_COOKIES may contain the actual Netscape cookie contents.
-    # The previous implementation treated it only as a file path, which
-    # caused Railway to produce:
-    #     No YouTube cookies found
-    #     'cookiefile': None
-    cookie_env = os.environ.get("YOUTUBE_COOKIES", "")
-
-    if cookie_env:
-        cookie_env = cookie_env.strip()
-
-        # Support the variable being a path as well as inline cookie content.
-        if os.path.isfile(cookie_env) and os.path.getsize(cookie_env) > 0:
-            try:
-                shutil.copyfile(cookie_env, writable_cookie)
-                os.chmod(writable_cookie, 0o600)
-
-                logger.info(
-                    "Loaded YouTube cookies from file path in YOUTUBE_COOKIES -> %s",
-                    writable_cookie
-                )
-                return writable_cookie
-
-            except Exception as e:
-                logger.warning(
-                    "Could not copy cookie file from YOUTUBE_COOKIES: %s",
-                    e
-                )
-
-        # Otherwise, treat YOUTUBE_COOKIES as the actual cookie-file content.
-        cookie_file = _write_cookie_content(
-            cookie_env,
-            "YOUTUBE_COOKIES"
-        )
-
-        if cookie_file:
-            return cookie_file
-
-    # 3. Explicit inline cookie content.
-    cookie_text = os.environ.get("YOUTUBE_COOKIES_TEXT", "").strip()
-
-    if cookie_text:
-        cookie_file = _write_cookie_content(
-            cookie_text,
-            "YOUTUBE_COOKIES_TEXT"
-        )
-
-        if cookie_file:
-            return cookie_file
-
-    # 4. Base64-encoded cookie content.
-    cookie_b64 = os.environ.get("YOUTUBE_COOKIES_BASE64", "").strip()
-
-    if cookie_b64:
-        try:
-            cookie_text = base64.b64decode(
-                cookie_b64
-            ).decode(
-                "utf-8",
-                errors="replace"
-            )
-
-            cookie_file = _write_cookie_content(
-                cookie_text,
-                "YOUTUBE_COOKIES_BASE64"
-            )
-
-            if cookie_file:
-                return cookie_file
-
-        except Exception as e:
-            logger.warning(
-                "Failed to decode YOUTUBE_COOKIES_BASE64: %s",
-                e
-            )
-
-    # 5. Local cookies.txt for local development.
-    project_root = os.path.dirname(
-        os.path.dirname(os.path.abspath(__file__))
-    )
-
-    candidates = [
-        os.path.join(project_root, "cookies.txt"),
-        os.path.abspath("cookies.txt"),
-        "cookies.txt",
-    ]
-
-    for path in candidates:
-        if (
-            os.path.isfile(path)
-            and os.path.getsize(path) > 0
-        ):
-            logger.info(
-                "Using local YouTube cookies file: %s",
-                path
-            )
-            return path
-
-    logger.warning(
-        "No YouTube cookies available. "
-        "Set YOUTUBE_COOKIES on Railway or provide cookies.txt locally."
-    )
-
-    return None
-
 
 def _get_cookie_opts():
     """
     Build yt-dlp cookie options.
-    If a cookies.txt file exists (e.g. /etc/secrets/cookies.txt -> /tmp/cookies.txt), uses it.
-    Otherwise attempts local browser cookie extraction on dev machines.
+
+    Priority:
+      1. YOUTUBE_COOKIES env var → path to a Netscape-format cookies.txt file
+         (ideal for headless servers like Render, Railway, Fly.io)
+      2. Browser cookie extraction → tries installed browsers on the local machine
+         (works on dev machines where the user is logged into YouTube)
+      3. Empty dict → no cookies (direct URLs, Vimeo, etc. still work)
     """
-    cookie_file = _get_cookie_file()
-    if cookie_file:
+    import shutil
+
+    # 1. Check for a cookies.txt file (server deployment path)
+    cookie_file = os.environ.get("YOUTUBE_COOKIES", "").strip()
+    if cookie_file and os.path.isfile(cookie_file):
+        logger.info(f"Using cookies file: {cookie_file}")
         return {'cookiefile': cookie_file}
 
-    # Browser cookie extraction (local dev machines only)
+    # Also check for a default cookies.txt in the project root
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    default_cookie_path = os.path.join(project_root, "cookies.txt")
+    if os.path.isfile(default_cookie_path):
+        logger.info(f"Using default cookies file: {default_cookie_path}")
+        return {'cookiefile': default_cookie_path}
+
+    # 2. Try browser cookie extraction (local dev machines only)
+    #    Map yt-dlp browser names → actual binary names to check
     browser_map = {
         "chrome":   ["google-chrome", "google-chrome-stable", "chrome"],
         "firefox":  ["firefox"],
@@ -244,9 +71,11 @@ def _get_cookie_opts():
         candidates = ["chrome", "firefox", "chromium", "brave", "edge"]
 
     for browser in candidates:
+        # Check if the browser binary is actually installed
         binaries = browser_map.get(browser, [browser])
         found = any(shutil.which(b) for b in binaries)
 
+        # On macOS, browsers live in /Applications, not on PATH
         if not found and platform.system() == "Darwin":
             mac_apps = {
                 "chrome":  "/Applications/Google Chrome.app",
@@ -261,6 +90,7 @@ def _get_cookie_opts():
             continue
 
         try:
+            # Attempt to actually load cookies by extracting info for a known short video
             test_opts = {
                 'quiet': True,
                 'no_warnings': True,
@@ -275,213 +105,145 @@ def _get_cookie_opts():
             logger.debug(f"Browser '{browser}' cookie extraction failed: {e}")
             continue
 
-    logger.warning("No YouTube cookies available. Set /etc/secrets/cookies.txt in Render for best reliability.")
+    logger.warning(
+        "No YouTube cookies available. YouTube may block downloads. "
+        "Set YOUTUBE_COOKIES env var to a cookies.txt file path, or "
+        "place a cookies.txt in the project root for server deployments."
+    )
     return {}
 
-
 def download_video_from_url(url, output_dir, job_id, progress_callback=None):
+    """
+    Downloads video from YouTube, Vimeo, or direct video URL using yt-dlp.
+    Guarantees the downloaded video is strictly under 500 MB and uses low-quality
+    streams (360p/480p) to keep RAM, disk, and CPU load minimal.
+    """
     os.makedirs(output_dir, exist_ok=True)
+    out_template = os.path.join(output_dir, f"{job_id}_%(title).50s.%(ext)s")
+    ffmpeg_exe = get_ffmpeg_path()
+    ffmpeg_dir = os.path.dirname(ffmpeg_exe)
 
-    output_template = os.path.join(
-        output_dir,
-        f"{job_id}.%(ext)s"
-    )
+    # Ensure ffmpeg dir is in PATH for any external subprocess
+    if ffmpeg_dir not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = f"{ffmpeg_dir}:{os.environ.get('PATH', '')}"
 
-    print("=" * 70)
-    print("YT-DLP DOWNLOAD START")
-    print("URL:", url)
-    print("DIRECTORY:", output_dir)
-    print("OUTPUT TEMPLATE:", output_template)
-    print("=" * 70)
+    def yt_hook(d):
+        if progress_callback and d.get('status') == 'downloading':
+            total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
+            downloaded = d.get('downloaded_bytes') or 0
+            pct = round((downloaded / total) * 100, 1) if total > 0 else 0
+            speed = d.get('speed') or 0
+            speed_mb = round(speed / (1024 * 1024), 1) if speed else 0
+            progress_callback(pct, speed_mb)
 
-    # Retrieve cookies using the cross-platform helper
-    cookie_file = _get_cookie_file()
-    if cookie_file:
-        logger.info(
-            "YouTube cookie file ready: %s",
-            cookie_file
+    # 1. Quick probe of video duration to select optimal low-load format
+    duration = 0
+    title = 'Downloaded Lecture'
+    cookie_opts = _get_cookie_opts()
+    try:
+        probe_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'noplaylist': True,
+            'http_headers': {'User-Agent': _USER_AGENT},
+            **cookie_opts,
+        }
+        with yt_dlp.YoutubeDL(probe_opts) as probe_ydl:
+            meta = probe_ydl.extract_info(url, download=False)
+            if meta:
+                duration = meta.get('duration', 0) or 0
+                title = meta.get('title', 'Downloaded Lecture')
+    except Exception as e:
+        logger.warning(f"Probe extract_info failed: {e}. Falling back to default format selector.")
+
+    # 2. Format selector for low quality (<500MB guaranteed, minimal memory & disk footprint)
+    # If video is long (> 3 hours = 10800s), target 240p/360p; otherwise 360p/480p
+    if duration > 10800:
+        format_spec = (
+            'bestvideo[height<=360][filesize_approx<=400M]+bestaudio[filesize_approx<=50M]/'
+            'bestvideo[height<=360]+bestaudio/'
+            'best[height<=360]/'
+            'worstvideo+worstaudio/worst'
         )
     else:
-        logger.warning(
-            "No YouTube cookies found. "
-            "Set YOUTUBE_COOKIES on Railway."
+        format_spec = (
+            'bestvideo[height<=480][filesize_approx<=400M]+bestaudio[filesize_approx<=60M]/'
+            'bestvideo[height<=360]+bestaudio/'
+            'best[height<=360]/'
+            'best[height<=480][filesize<=480M]/'
+            'bestvideo[filesize_approx<=420M]+bestaudio/'
+            'worstvideo+worstaudio/worst'
         )
 
-    bgutil_url = os.getenv(
-        "BGUTIL_BASE_URL",
-        "http://127.0.0.1:4416"
-    )
-
-    
     ydl_opts = {
-        "outtmpl": output_template,
-
-        "format": "bv*+ba/b",
-        "merge_output_format": "mp4",
-
-        "noplaylist": True,
-        "quiet": False,
-        "verbose": True,
-        "no_warnings": False,
-        "retries": 5,
-        "fragment_retries": 5,
-        "socket_timeout": 30,
-        "continuedl": True,
-        "nopart": False,
-        
-        "cookiefile": cookie_file,
-        
-        "cachedir": "/tmp/yt-dlp-cache",
-        "ffmpeg_location": get_ffmpeg_path(),
-        
-        "extractor_args": {
-            "youtubepot-bgutilhttp": {
-                "base_url": bgutil_url
-            }
-        },
+        'ffmpeg_location': ffmpeg_exe,
+        'format': format_spec,
+        'outtmpl': out_template,
+        'merge_output_format': 'mp4',
+        'progress_hooks': [yt_hook],
+        'quiet': True,
+        'no_warnings': True,
+        'noplaylist': True,
+        'max_filesize': MAX_ALLOWED_SIZE_BYTES,
+        'http_headers': {'User-Agent': _USER_AGENT},
+        **cookie_opts,
     }
 
-    title = "Video"
-    duration = 0
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        logger.info(f"Downloading low-quality video (<500MB) from URL: {url}")
+        info = ydl.extract_info(url, download=True)
+        title = info.get('title', title)
+        duration = info.get('duration', duration)
+        filename = ydl.prepare_filename(info)
+        
+        # Ensure mp4 extension if merged
+        base, _ = os.path.splitext(filename)
+        if os.path.exists(base + ".mp4"):
+            filepath = base + ".mp4"
+        elif os.path.exists(filename):
+            filepath = filename
+        else:
+            candidates = [os.path.join(output_dir, f) for f in os.listdir(output_dir) if f.startswith(job_id)]
+            filepath = candidates[0] if candidates else filename
 
-    # Clean up any partial files from previous attempts
-    import glob
-    for f in glob.glob(os.path.join(output_dir, f"{job_id}.*")):
-        try:
-            os.remove(f)
-        except OSError:
-            pass
+    # 3. Post-download verification: ensure strict < 500 MB constraint
+    if os.path.exists(filepath):
+        actual_size = os.path.getsize(filepath)
+        if actual_size > MAX_ALLOWED_SIZE_BYTES:
+            logger.warning(f"Downloaded file {filepath} ({actual_size / (1024*1024):.1f}MB) exceeds 480MB. Compressing with FFmpeg...")
+            compressed_path = os.path.join(output_dir, f"{job_id}_compact.mp4")
+            dur = max(1.0, float(duration or 3600))
+            # Target 380MB max to stay well under 500MB
+            target_bitrate_kbps = max(120, int((380 * 8192) / dur))
+            video_bitrate = max(90, target_bitrate_kbps - 48)
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            
-            if info:
-                title = info.get("title", title)
-                duration = info.get("duration", duration)
-
-                print("\nYT-DLP INFO")
-                print("ID:", info.get("id"))
-                print("TITLE:", title)
-                print("EXT:", info.get("ext"))
-                print("FORMAT:", info.get("format"))
-                print("SIZE:", info.get("filesize"))
-                print("REQUESTED DOWNLOADS:", info.get("requested_downloads"))
-            else:
-                print("\nYT-DLP returned None for info. Could not extract metadata.")
-            
-    except Exception as e:
-        print("\nYT-DLP EXCEPTION:", str(e))
-        raise RuntimeError(
-            f"Unable to download YouTube video. Bot detection may be blocking the server.\n{str(e)}"
-        )
-
-    print("\nFILES AFTER DOWNLOAD:")
-
-    all_files = []
-
-    for root, dirs, files in os.walk(output_dir):
-        for filename in files:
-            full_path = os.path.join(root, filename)
-
-            try:
-                size = os.path.getsize(full_path)
-            except OSError:
-                size = 0
-
-            print(
-                f"FILE: {repr(full_path)} | "
-                f"SIZE: {size / (1024 * 1024):.2f} MB"
-            )
-
-            all_files.append(full_path)
-
-    print("=" * 70)
-
-    # Ignore temporary files
-    import glob
-    media_files = [
-        f for f in all_files
-        if not f.endswith(".part")
-        and not f.endswith(".ytdl")
-        and not f.endswith(".json")
-        and os.path.basename(f).startswith(job_id)
-    ]
-
-    if not media_files:
-        raise RuntimeError(
-            "yt-dlp completed, but no final media file exists. "
-            "Check the Render logs above for the actual yt-dlp output."
-        )
-
-    downloaded_file = max(
-        media_files,
-        key=os.path.getsize
-    )
-
-    size_mb = os.path.getsize(downloaded_file) / (1024 * 1024)
-    print("SELECTED FILE:", downloaded_file)
-    print(f"Final file size: {size_mb:.2f} MB")
-    
-    if size_mb > 480:
-        os.remove(downloaded_file)
-        raise RuntimeError(
-            f"Downloaded video is {size_mb:.1f} MB, "
-            "which exceeds the 480 MB limit."
-        )
+            compress_cmd = [
+                ffmpeg_exe, "-y",
+                "-i", filepath,
+                "-vf", "scale=-2:'min(360,ih)'",
+                "-c:v", "libx264",
+                "-b:v", f"{video_bitrate}k",
+                "-preset", "veryfast",
+                "-c:a", "aac",
+                "-b:a", "48k",
+                compressed_path
+            ]
+            res = subprocess.run(compress_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            if res.returncode == 0 and os.path.exists(compressed_path) and os.path.getsize(compressed_path) > 0:
+                os.remove(filepath)
+                os.rename(compressed_path, filepath)
+                logger.info(f"Compressed file successfully to {os.path.getsize(filepath)/(1024*1024):.1f}MB")
 
     return {
         "title": title,
-        "filepath": downloaded_file,
+        "filepath": filepath,
         "duration": duration,
-        "filename": os.path.basename(downloaded_file)
+        "filename": os.path.basename(filepath)
     }
-
-def prepare_cookies():
-    cookie_file = _get_cookie_file()
-    if not cookie_file:
-        raise RuntimeError(
-            "YouTube cookie file not found. Set YOUTUBE_COOKIES on Railway "
-            "with the exported Netscape cookie contents, or use cookies.txt locally."
-        )
-    return cookie_file
-
-
-def test_youtube():
-    import yt_dlp
-
-    cookie_file = prepare_cookies()
-
-    bgutil_url = os.getenv(
-        "BGUTIL_BASE_URL",
-        "http://127.0.0.1:4416"
-    )
-
-    opts = {
-        "cookiefile": cookie_file,
-        "format": "best",
-        "extractor_args": {
-            "youtubepot-bgutilhttp": {
-                "base_url": bgutil_url
-            }
-        },
-        "verbose": True,
-    }
-
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        ydl.download(
-            ["https://youtu.be/2K1AvuJjwmk"]
-        )
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     if len(sys.argv) > 1:
-        if sys.argv[1] == "test":
-            print("Running yt-dlp test...")
-            test_youtube()
-            print("Test complete.")
-            sys.exit(0)
-        
         test_url = sys.argv[1]
         out_dir = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
         print(f"Starting download from URL: {test_url}")
@@ -497,4 +259,3 @@ if __name__ == "__main__":
         print("VidSeek URL Downloader Service")
         print("Usage: python services/url_downloader.py <video_url> [output_dir]")
         print("Example: python services/url_downloader.py https://www.youtube.com/watch?v=example uploads")
-

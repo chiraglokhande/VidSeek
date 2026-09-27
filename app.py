@@ -17,14 +17,11 @@ from services.video_processor import (
     format_timestamp
 )
 
-# Ensure FFmpeg and Deno are on PATH for any subprocess or tool (including yt-dlp)
+# Ensure FFmpeg is on PATH for any subprocess or tool (including yt-dlp)
 try:
     _ff_dir = os.path.dirname(get_ffmpeg_path())
     _venv_bin = os.path.abspath(os.path.join(os.path.dirname(__file__), ".venv", "bin"))
-    _deno_user = os.path.expanduser("~/.deno/bin")
-    _deno_local = os.path.abspath(os.path.join(os.path.dirname(__file__), ".deno", "bin"))
-    _deno_root = "/root/.deno/bin"
-    os.environ["PATH"] = f"{_deno_user}:{_deno_local}:{_deno_root}:{_ff_dir}:{_venv_bin}:{os.environ.get('PATH', '')}"
+    os.environ["PATH"] = f"{_ff_dir}:{_venv_bin}:{os.environ.get('PATH', '')}"
 except Exception:
     pass
 from services.transcriber import transcribe_audio
@@ -266,23 +263,8 @@ def upload_video():
     if not file.filename:
         return jsonify({"error": "Empty filename"}), 400
 
-    original_filename = file.filename
-    ext = os.path.splitext(original_filename)[1].lower()
-    allowed_extensions = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"}
-    
-    if ext not in allowed_extensions:
-        return jsonify({"error": f"Unsupported video format: {ext}"}), 400
-
-    import unicodedata
-    import re
-    
-    base = os.path.splitext(original_filename)[0]
-    base = unicodedata.normalize("NFKC", base)
-    base = re.sub(r"[^A-Za-z0-9._-]", "_", base)
-    base = re.sub(r"_+", "_", base).strip("_")
-
     job_id = str(uuid.uuid4())[:8]
-    filename = f"{job_id}_{base}{ext}"
+    filename = f"{job_id}_{file.filename}"
     saved_path = os.path.join(UPLOAD_DIR, filename)
     file.save(saved_path)
 
