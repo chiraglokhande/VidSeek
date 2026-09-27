@@ -207,8 +207,8 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         # yt-dlp uses plugins like bgutil-ytdlp-pot-provider automatically when installed.
         "extractor_args": {
             "youtube": {
-                # Use a mix of clients that bypass bot checks, combined with PO Tokens for the web client if the plugin provides them
-                "player_client": ["ios", "android", "web"]
+                # tv_embedded avoids SABR streaming experiment blocks better than ios/android alone
+                "player_client": ["tv_embedded", "ios", "android"]
             }
         },
     }
