@@ -22,7 +22,7 @@ export PATH="$HOME/.deno/bin:$PATH"
 echo "Setting up bgutil-ytdlp-pot-provider..."
 if [ ! -d "/tmp/bgutil-ytdlp-pot-provider" ]; then
   echo "Cloning bgutil-ytdlp-pot-provider repository..."
-  git clone https://github.com/jim60105/bgutil-ytdlp-pot-provider.rs.git /tmp/bgutil-ytdlp-pot-provider
+  git clone https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /tmp/bgutil-ytdlp-pot-provider
 else
   echo "bgutil-ytdlp-pot-provider already cloned."
 fi
