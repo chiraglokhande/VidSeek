@@ -203,10 +203,6 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
                 "player_client": ["android,web"]
             }
         },
-        
-        "js_runtimes": {
-            "deno": None
-        },
     }
 
     title = "Video"
@@ -326,9 +322,6 @@ def test_youtube():
             "youtube": {
                 "player_client": ["android,web"]
             }
-        },
-        "js_runtimes": {
-            "deno": None
         },
         "verbose": True,
     }
