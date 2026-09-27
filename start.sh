@@ -2,7 +2,8 @@
 
 set -e
 
-export PATH="$HOME/.deno/bin:$PATH"
+export DENO_INSTALL="$(pwd)/.deno"
+export PATH="$DENO_INSTALL/bin:$PATH"
 
 echo "================================="
 echo "Starting VidSeek"
@@ -16,7 +17,7 @@ yt-dlp --version
 
 echo "Starting bgutil PO Token provider..."
 
-cd /tmp/bgutil-ytdlp-pot-provider/server
+cd "$(pwd)/bgutil-ytdlp-pot-provider/server"
 
 deno run \
   --allow-env \
