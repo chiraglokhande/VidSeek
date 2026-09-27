@@ -172,19 +172,22 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     print("OUTPUT TEMPLATE:", output_template)
     print("=" * 70)
 
-    # Render Secret Cookie Setup (Copy to writable /tmp for yt-dlp to update)
-    render_cookie_path = "/etc/secrets/cookies.txt"
-    working_cookie_path = "/tmp/vidseek_cookies.txt"
+    # Render Secret Cookie Setup
+    RENDER_COOKIE_FILE = "/etc/secrets/cookies.txt"
+    WORKING_COOKIE_FILE = "/tmp/cookies.txt"
     
-    if os.path.exists(render_cookie_path):
-        shutil.copyfile(render_cookie_path, working_cookie_path)
-        os.chmod(working_cookie_path, 0o600)
+    if not os.path.exists(RENDER_COOKIE_FILE):
+        logger.warning(f"YouTube cookie file not found at {RENDER_COOKIE_FILE}")
+        cookie_file = None
+    else:
+        shutil.copyfile(RENDER_COOKIE_FILE, WORKING_COOKIE_FILE)
+        os.chmod(WORKING_COOKIE_FILE, 0o600)
+        cookie_file = WORKING_COOKIE_FILE
     
     ydl_opts = {
         "outtmpl": output_template,
 
-        # robust fallback format: prefer mp4, allow merging if no single file is available
-        "format": "bestvideo[height<=480]+bestaudio/best[height<=480]/best",
+        "format": "bv*+ba/b",
         "merge_output_format": "mp4",
 
         "noplaylist": True,
@@ -197,17 +200,13 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         "continuedl": True,
         "nopart": False,
         
-        # Use the writable cookie file if we copied it, else check if one exists in /tmp
-        "cookiefile": working_cookie_path if os.path.exists(working_cookie_path) else None,
+        "cookiefile": cookie_file,
         
         "cachedir": "/tmp/yt-dlp-cache",
         "ffmpeg_location": get_ffmpeg_path(),
         
-        "extractor_args": {
-            "youtube": {
-                # Use android and ios as a comma-separated string so yt-dlp parses it as a fallback chain correctly
-                "player_client": ["android,ios"]
-            }
+        "js_runtimes": {
+            "deno": None
         },
     }
 
@@ -304,9 +303,54 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         "filename": os.path.basename(downloaded_file)
     }
 
+def prepare_cookies():
+    RENDER_COOKIE_FILE = "/etc/secrets/cookies.txt"
+    WORKING_COOKIE_FILE = "/tmp/cookies.txt"
+    
+    if not os.path.exists(RENDER_COOKIE_FILE):
+        raise RuntimeError(
+            "YouTube cookie file not found at "
+            + RENDER_COOKIE_FILE
+        )
+
+    shutil.copyfile(
+        RENDER_COOKIE_FILE,
+        WORKING_COOKIE_FILE
+    )
+
+    os.chmod(WORKING_COOKIE_FILE, 0o600)
+
+    return WORKING_COOKIE_FILE
+
+
+def test_youtube():
+    import yt_dlp
+
+    cookie_file = prepare_cookies()
+
+    opts = {
+        "cookiefile": cookie_file,
+        "format": "best",
+        "js_runtimes": {
+            "deno": None
+        },
+        "verbose": True,
+    }
+
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        ydl.download(
+            ["https://youtu.be/2K1AvuJjwmk"]
+        )
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     if len(sys.argv) > 1:
+        if sys.argv[1] == "test":
+            print("Running yt-dlp test...")
+            test_youtube()
+            print("Test complete.")
+            sys.exit(0)
+        
         test_url = sys.argv[1]
         out_dir = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
         print(f"Starting download from URL: {test_url}")
@@ -322,3 +366,4 @@ if __name__ == "__main__":
         print("VidSeek URL Downloader Service")
         print("Usage: python services/url_downloader.py <video_url> [output_dir]")
         print("Example: python services/url_downloader.py https://www.youtube.com/watch?v=example uploads")
+
