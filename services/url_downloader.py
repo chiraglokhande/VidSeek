@@ -184,14 +184,16 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         "outtmpl": output_template,
 
         # robust fallback format: prefer mp4, allow merging if no single file is available
-        "format": "bestvideo[height<=480]+bestaudio/best[height<=480]/best",
+        "format": "bv*+ba/b",
         "merge_output_format": "mp4",
 
         "noplaylist": True,
         "quiet": False,
+        "verbose": True,
         "no_warnings": False,
-        "retries": 3,
-        "fragment_retries": 3,
+        "retries": 5,
+        "fragment_retries": 5,
+        "socket_timeout": 30,
         "continuedl": True,
         "nopart": False,
         
