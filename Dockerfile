@@ -11,6 +11,7 @@ RUN apt-get update && \
         curl \
         ca-certificates \
         ffmpeg \
+        unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Deno
