@@ -195,8 +195,12 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         # Keep our cookie configuration to avoid bot blocks
         "cookiefile": "/tmp/vidseek_cookies.txt" if os.path.exists("/tmp/vidseek_cookies.txt") else None,
         "cachedir": "/tmp/yt-dlp-cache",
-        "http_headers": {'User-Agent': _USER_AGENT},
         "ffmpeg_location": get_ffmpeg_path(),
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["ios,android"]
+            }
+        },
     }
 
     # Fetch cookies to writable tmp
