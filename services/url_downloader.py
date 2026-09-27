@@ -172,8 +172,13 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     print("OUTPUT TEMPLATE:", output_template)
     print("=" * 70)
 
-    # Render Secret Cookie Setup (Direct Path for yt-dlp)
-    cookie_path = "/etc/secrets/cookies.txt"
+    # Render Secret Cookie Setup (Copy to writable /tmp for yt-dlp to update)
+    render_cookie_path = "/etc/secrets/cookies.txt"
+    working_cookie_path = "/tmp/vidseek_cookies.txt"
+    
+    if os.path.exists(render_cookie_path):
+        shutil.copyfile(render_cookie_path, working_cookie_path)
+        os.chmod(working_cookie_path, 0o600)
     
     ydl_opts = {
         "outtmpl": output_template,
@@ -190,10 +195,8 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         "continuedl": True,
         "nopart": False,
         
-        # Pass the Render Secret file directly if it exists, or fallback to local
-        "cookiefile": cookie_path if os.path.exists(cookie_path) else (
-            "/tmp/vidseek_cookies.txt" if os.path.exists("/tmp/vidseek_cookies.txt") else None
-        ),
+        # Use the writable cookie file if we copied it, else check if one exists in /tmp
+        "cookiefile": working_cookie_path if os.path.exists(working_cookie_path) else None,
         
         "cachedir": "/tmp/yt-dlp-cache",
         "ffmpeg_location": get_ffmpeg_path(),
