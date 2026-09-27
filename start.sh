@@ -47,4 +47,5 @@ cd -
 
 echo "Starting Gunicorn..."
 
-exec gunicorn app:app
+PORT=${PORT:-8080}
+exec gunicorn --bind "0.0.0.0:$PORT" app:app
