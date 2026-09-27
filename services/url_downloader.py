@@ -183,9 +183,9 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     ydl_opts = {
         "outtmpl": output_template,
 
-        # robust fallback format: prefer mp4, allow merging if no single file is available
-        "format": "bv*+ba/b",
-        "merge_output_format": "mp4",
+        # Diagnostic test format
+        "format": "best",
+        # "merge_output_format": "mp4",
 
         "noplaylist": True,
         "quiet": False,
