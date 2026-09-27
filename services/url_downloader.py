@@ -28,67 +28,189 @@ _USER_AGENT = (
 
 def _get_cookie_file():
     """
-    Finds and returns the path to a writable cookies.txt file.
+    Resolve YouTube cookies into a writable local file.
+
     Priority:
-      1. /etc/secrets/cookies.txt (Render native Secret File location -> copied to writable /tmp/cookies.txt)
-      2. YOUTUBE_COOKIES environment variable (copied to /tmp/cookies.txt)
-      3. cookies.txt in current directory or project root
-      4. YOUTUBE_COOKIES_TEXT or YOUTUBE_COOKIES_BASE64 written to /tmp/cookies.txt
+      1. /etc/secrets/cookies.txt (Render Secret File, copied to /tmp)
+      2. YOUTUBE_COOKIES environment variable:
+         - if it points to an existing file, copy that file
+         - otherwise treat the variable itself as Netscape cookie-file content
+      3. YOUTUBE_COOKIES_TEXT (inline Netscape cookie content)
+      4. YOUTUBE_COOKIES_BASE64 (base64-encoded cookie content)
+      5. local cookies.txt in the project/current directory
     """
     import base64
 
-    writable_cookie = "/tmp/cookies.txt" if os.path.exists("/tmp") else os.path.join(tempfile.gettempdir(), "cookies.txt")
+    writable_cookie = os.path.join(
+        tempfile.gettempdir(),
+        "youtube_cookies.txt"
+    )
 
-    # 1. Render native Secret File path (Render mounts /etc/secrets as read-only, copy to /tmp)
+    def _write_cookie_content(cookie_text, source_name):
+        if not cookie_text:
+            return None
+
+        try:
+            # Keep the exact cookie-file structure. Do not log the contents.
+            with open(
+                writable_cookie,
+                "w",
+                encoding="utf-8",
+                newline="\n"
+            ) as f:
+                f.write(cookie_text)
+
+            os.chmod(writable_cookie, 0o600)
+
+            if os.path.getsize(writable_cookie) == 0:
+                logger.warning(
+                    "YouTube cookie source %s produced an empty cookie file",
+                    source_name
+                )
+                return None
+
+            logger.info(
+                "Loaded YouTube cookies from %s -> %s",
+                source_name,
+                writable_cookie
+            )
+            return writable_cookie
+
+        except Exception as e:
+            logger.warning(
+                "Failed to write YouTube cookies from %s: %s",
+                source_name,
+                e
+            )
+            return None
+
+    # 1. Render native Secret File.
     render_secret_path = "/etc/secrets/cookies.txt"
-    if os.path.exists(render_secret_path) and os.path.getsize(render_secret_path) > 0:
+
+    if (
+        os.path.isfile(render_secret_path)
+        and os.path.getsize(render_secret_path) > 0
+    ):
         try:
             shutil.copyfile(render_secret_path, writable_cookie)
-            logger.info(f"Copied read-only Render secret {render_secret_path} -> writable {writable_cookie}")
-            return writable_cookie
-        except Exception as e:
-            logger.warning(f"Could not copy {render_secret_path} to {writable_cookie}: {e}")
-            return render_secret_path
+            os.chmod(writable_cookie, 0o600)
 
-    # 2. Check for a cookies.txt file via YOUTUBE_COOKIES env var
-    cookie_file = os.environ.get("YOUTUBE_COOKIES", "").strip()
-    if cookie_file and os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 0:
-        try:
-            shutil.copyfile(cookie_file, writable_cookie)
-            logger.info(f"Copied {cookie_file} -> writable {writable_cookie}")
+            logger.info(
+                "Loaded YouTube cookies from Render Secret File -> %s",
+                writable_cookie
+            )
             return writable_cookie
-        except Exception:
+
+        except Exception as e:
+            logger.warning(
+                "Could not copy Render Secret File: %s",
+                e
+            )
+
+    # 2. Railway/Render environment variable.
+    #
+    # IMPORTANT:
+    # YOUTUBE_COOKIES may contain the actual Netscape cookie contents.
+    # The previous implementation treated it only as a file path, which
+    # caused Railway to produce:
+    #     No YouTube cookies found
+    #     'cookiefile': None
+    cookie_env = os.environ.get("YOUTUBE_COOKIES", "")
+
+    if cookie_env:
+        cookie_env = cookie_env.strip()
+
+        # Support the variable being a path as well as inline cookie content.
+        if os.path.isfile(cookie_env) and os.path.getsize(cookie_env) > 0:
+            try:
+                shutil.copyfile(cookie_env, writable_cookie)
+                os.chmod(writable_cookie, 0o600)
+
+                logger.info(
+                    "Loaded YouTube cookies from file path in YOUTUBE_COOKIES -> %s",
+                    writable_cookie
+                )
+                return writable_cookie
+
+            except Exception as e:
+                logger.warning(
+                    "Could not copy cookie file from YOUTUBE_COOKIES: %s",
+                    e
+                )
+
+        # Otherwise, treat YOUTUBE_COOKIES as the actual cookie-file content.
+        cookie_file = _write_cookie_content(
+            cookie_env,
+            "YOUTUBE_COOKIES"
+        )
+
+        if cookie_file:
             return cookie_file
 
-    # 3. Check for cookies.txt in project root or current working directory
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # 3. Explicit inline cookie content.
+    cookie_text = os.environ.get("YOUTUBE_COOKIES_TEXT", "").strip()
+
+    if cookie_text:
+        cookie_file = _write_cookie_content(
+            cookie_text,
+            "YOUTUBE_COOKIES_TEXT"
+        )
+
+        if cookie_file:
+            return cookie_file
+
+    # 4. Base64-encoded cookie content.
+    cookie_b64 = os.environ.get("YOUTUBE_COOKIES_BASE64", "").strip()
+
+    if cookie_b64:
+        try:
+            cookie_text = base64.b64decode(
+                cookie_b64
+            ).decode(
+                "utf-8",
+                errors="replace"
+            )
+
+            cookie_file = _write_cookie_content(
+                cookie_text,
+                "YOUTUBE_COOKIES_BASE64"
+            )
+
+            if cookie_file:
+                return cookie_file
+
+        except Exception as e:
+            logger.warning(
+                "Failed to decode YOUTUBE_COOKIES_BASE64: %s",
+                e
+            )
+
+    # 5. Local cookies.txt for local development.
+    project_root = os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__))
+    )
+
     candidates = [
         os.path.join(project_root, "cookies.txt"),
         os.path.abspath("cookies.txt"),
-        "cookies.txt"
+        "cookies.txt",
     ]
-    for p in candidates:
-        if os.path.exists(p) and os.path.getsize(p) > 0:
-            logger.info(f"Using cookies file: {p}")
-            return p
 
-    # 4. Inline cookie content passed via environment variable (Render dashboard)
-    cookie_text = os.environ.get("YOUTUBE_COOKIES_TEXT", "").strip()
-    cookie_b64 = os.environ.get("YOUTUBE_COOKIES_BASE64", "").strip()
-    if cookie_b64 and not cookie_text:
-        try:
-            cookie_text = base64.b64decode(cookie_b64).decode("utf-8", errors="replace")
-        except Exception as e:
-            logger.warning(f"Failed to decode YOUTUBE_COOKIES_BASE64: {e}")
+    for path in candidates:
+        if (
+            os.path.isfile(path)
+            and os.path.getsize(path) > 0
+        ):
+            logger.info(
+                "Using local YouTube cookies file: %s",
+                path
+            )
+            return path
 
-    if cookie_text:
-        try:
-            with open(writable_cookie, "w", encoding="utf-8") as f:
-                f.write(cookie_text)
-            logger.info(f"Using cookies generated from environment variable at: {writable_cookie}")
-            return writable_cookie
-        except Exception as e:
-            logger.warning(f"Failed to write cookies from env to {writable_cookie}: {e}")
+    logger.warning(
+        "No YouTube cookies available. "
+        "Set YOUTUBE_COOKIES on Railway or provide cookies.txt locally."
+    )
 
     return None
 
@@ -174,8 +296,16 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
 
     # Retrieve cookies using the cross-platform helper
     cookie_file = _get_cookie_file()
-    if not cookie_file:
-        logger.warning("No YouTube cookies found. Bot detection is highly likely.")
+    if cookie_file:
+        logger.info(
+            "YouTube cookie file ready: %s",
+            cookie_file
+        )
+    else:
+        logger.warning(
+            "No YouTube cookies found. "
+            "Set YOUTUBE_COOKIES on Railway."
+        )
 
     bgutil_url = os.getenv(
         "BGUTIL_BASE_URL",
@@ -205,9 +335,6 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         "ffmpeg_location": get_ffmpeg_path(),
         
         "extractor_args": {
-            "youtube": {
-                "player_client": ["android,web"]
-            },
             "youtubepot-bgutilhttp": {
                 "base_url": bgutil_url
             }
@@ -314,7 +441,8 @@ def prepare_cookies():
     cookie_file = _get_cookie_file()
     if not cookie_file:
         raise RuntimeError(
-            "YouTube cookie file not found. Set YOUTUBE_COOKIES_TEXT or use a cookies.txt file."
+            "YouTube cookie file not found. Set YOUTUBE_COOKIES on Railway "
+            "with the exported Netscape cookie contents, or use cookies.txt locally."
         )
     return cookie_file
 
@@ -333,9 +461,6 @@ def test_youtube():
         "cookiefile": cookie_file,
         "format": "best",
         "extractor_args": {
-            "youtube": {
-                "player_client": ["android,web"]
-            },
             "youtubepot-bgutilhttp": {
                 "base_url": bgutil_url
             }
