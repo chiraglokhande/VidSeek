@@ -22,8 +22,8 @@ def get_whisper_model(model_size="base"):
         try:
             from faster_whisper import WhisperModel
             logger.info(f"Loading faster-whisper model: {model_size}")
-            # Use int8 compute and 6 cpu threads for high-throughput transcription
-            _whisper_model = WhisperModel(model_size, device="cpu", compute_type="int8", cpu_threads=6)
+            # Use int8 compute and 2 cpu threads for lower memory footprint
+            _whisper_model = WhisperModel(model_size, device="cpu", compute_type="int8", cpu_threads=2)
         except Exception as e:
             logger.warning(f"Could not load faster-whisper: {e}. Fallback to simulated/rule-based transcriber.")
             _whisper_model = None
