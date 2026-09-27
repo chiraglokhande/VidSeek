@@ -183,9 +183,9 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     ydl_opts = {
         "outtmpl": output_template,
 
-        # Diagnostic test format
-        "format": "best",
-        # "merge_output_format": "mp4",
+        # robust fallback format: prefer mp4, allow merging if no single file is available
+        "format": "bestvideo[height<=480]+bestaudio/best[height<=480]/best",
+        "merge_output_format": "mp4",
 
         "noplaylist": True,
         "quiet": False,
@@ -203,12 +203,10 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         "cachedir": "/tmp/yt-dlp-cache",
         "ffmpeg_location": get_ffmpeg_path(),
         
-        # YouTube client handling & PO-token-compatible setup
-        # yt-dlp uses plugins like bgutil-ytdlp-pot-provider automatically when installed.
         "extractor_args": {
             "youtube": {
-                # tv_embedded avoids SABR streaming experiment blocks better than ios/android alone
-                "player_client": ["tv_embedded", "ios", "android"]
+                # Use android and ios as a comma-separated string so yt-dlp parses it as a fallback chain correctly
+                "player_client": ["android,ios"]
             }
         },
     }
