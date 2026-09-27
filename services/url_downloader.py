@@ -176,6 +176,12 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     cookie_file = _get_cookie_file()
     if not cookie_file:
         logger.warning("No YouTube cookies found. Bot detection is highly likely.")
+
+    bgutil_url = os.getenv(
+        "BGUTIL_BASE_URL",
+        "http://127.0.0.1:4416"
+    )
+
     
     ydl_opts = {
         "outtmpl": output_template,
@@ -201,6 +207,9 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         "extractor_args": {
             "youtube": {
                 "player_client": ["android,web"]
+            },
+            "youtubepot-bgutilhttp": {
+                "base_url": bgutil_url
             }
         },
     }
@@ -315,12 +324,20 @@ def test_youtube():
 
     cookie_file = prepare_cookies()
 
+    bgutil_url = os.getenv(
+        "BGUTIL_BASE_URL",
+        "http://127.0.0.1:4416"
+    )
+
     opts = {
         "cookiefile": cookie_file,
         "format": "best",
         "extractor_args": {
             "youtube": {
                 "player_client": ["android,web"]
+            },
+            "youtubepot-bgutilhttp": {
+                "base_url": bgutil_url
             }
         },
         "verbose": True,
