@@ -198,6 +198,12 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         "cachedir": "/tmp/yt-dlp-cache",
         "ffmpeg_location": get_ffmpeg_path(),
         
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android,web"]
+            }
+        },
+        
         "js_runtimes": {
             "deno": None
         },
@@ -316,6 +322,11 @@ def test_youtube():
     opts = {
         "cookiefile": cookie_file,
         "format": "best",
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android,web"]
+            }
+        },
         "js_runtimes": {
             "deno": None
         },
