@@ -21,15 +21,12 @@ fi
 export PATH="$DENO_INSTALL/bin:$PATH"
 
 echo "Setting up bgutil-ytdlp-pot-provider..."
-if [ ! -d "$(pwd)/bgutil-ytdlp-pot-provider" ]; then
-  echo "Cloning bgutil-ytdlp-pot-provider repository..."
-  git clone https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git "$(pwd)/bgutil-ytdlp-pot-provider"
-  cd "$(pwd)/bgutil-ytdlp-pot-provider/server"
-  echo "Installing Deno dependencies..."
-  deno install
-  cd -
-else
-  echo "bgutil-ytdlp-pot-provider already cloned."
-fi
+rm -rf "$(pwd)/bgutil-ytdlp-pot-provider"
+echo "Cloning bgutil-ytdlp-pot-provider repository..."
+git clone https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git "$(pwd)/bgutil-ytdlp-pot-provider"
+cd "$(pwd)/bgutil-ytdlp-pot-provider/server"
+echo "Installing Deno dependencies..."
+deno install
+cd -
 
 echo "Build script completed successfully!"
