@@ -172,6 +172,9 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     print("OUTPUT TEMPLATE:", output_template)
     print("=" * 70)
 
+    # Render Secret Cookie Setup (Direct Path for yt-dlp)
+    cookie_path = "/etc/secrets/cookies.txt"
+    
     ydl_opts = {
         "outtmpl": output_template,
 
@@ -180,33 +183,30 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         "merge_output_format": "mp4",
 
         "noplaylist": True,
-
         "quiet": False,
         "no_warnings": False,
-
         "retries": 3,
         "fragment_retries": 3,
-
         "continuedl": True,
-
-        # Don't abort because of your application's size assumption.
         "nopart": False,
         
-        # Keep our cookie configuration to avoid bot blocks
-        "cookiefile": "/tmp/vidseek_cookies.txt" if os.path.exists("/tmp/vidseek_cookies.txt") else None,
+        # Pass the Render Secret file directly if it exists, or fallback to local
+        "cookiefile": cookie_path if os.path.exists(cookie_path) else (
+            "/tmp/vidseek_cookies.txt" if os.path.exists("/tmp/vidseek_cookies.txt") else None
+        ),
+        
         "cachedir": "/tmp/yt-dlp-cache",
         "ffmpeg_location": get_ffmpeg_path(),
+        
+        # YouTube client handling & PO-token-compatible setup
+        # yt-dlp uses plugins like bgutil-ytdlp-pot-provider automatically when installed.
         "extractor_args": {
             "youtube": {
-                "player_client": ["ios,android"]
+                # Use a mix of clients that bypass bot checks, combined with PO Tokens for the web client if the plugin provides them
+                "player_client": ["ios", "android", "web"]
             }
         },
     }
-
-    # Fetch cookies to writable tmp
-    if os.path.exists("/etc/secrets/cookies.txt"):
-        shutil.copyfile("/etc/secrets/cookies.txt", "/tmp/vidseek_cookies.txt")
-        ydl_opts["cookiefile"] = "/tmp/vidseek_cookies.txt"
 
     title = "Video"
     duration = 0
