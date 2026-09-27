@@ -48,4 +48,4 @@ cd -
 echo "Starting Gunicorn..."
 
 PORT=${PORT:-8080}
-exec gunicorn --bind "0.0.0.0:$PORT" app:app
+exec gunicorn --bind "0.0.0.0:$PORT" --workers 1 --threads 2 --timeout 600 app:app
