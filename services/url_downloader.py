@@ -225,16 +225,19 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             
-            title = info.get("title", title)
-            duration = info.get("duration", duration)
+            if info:
+                title = info.get("title", title)
+                duration = info.get("duration", duration)
 
-            print("\nYT-DLP INFO")
-            print("ID:", info.get("id"))
-            print("TITLE:", title)
-            print("EXT:", info.get("ext"))
-            print("FORMAT:", info.get("format"))
-            print("SIZE:", info.get("filesize"))
-            print("REQUESTED DOWNLOADS:", info.get("requested_downloads"))
+                print("\nYT-DLP INFO")
+                print("ID:", info.get("id"))
+                print("TITLE:", title)
+                print("EXT:", info.get("ext"))
+                print("FORMAT:", info.get("format"))
+                print("SIZE:", info.get("filesize"))
+                print("REQUESTED DOWNLOADS:", info.get("requested_downloads"))
+            else:
+                print("\nYT-DLP returned None for info. Could not extract metadata.")
             
     except Exception as e:
         print("\nYT-DLP EXCEPTION:", str(e))
