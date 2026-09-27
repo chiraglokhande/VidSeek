@@ -172,17 +172,10 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     print("OUTPUT TEMPLATE:", output_template)
     print("=" * 70)
 
-    # Render Secret Cookie Setup
-    RENDER_COOKIE_FILE = "/etc/secrets/cookies.txt"
-    WORKING_COOKIE_FILE = "/tmp/cookies.txt"
-    
-    if not os.path.exists(RENDER_COOKIE_FILE):
-        logger.warning(f"YouTube cookie file not found at {RENDER_COOKIE_FILE}")
-        cookie_file = None
-    else:
-        shutil.copyfile(RENDER_COOKIE_FILE, WORKING_COOKIE_FILE)
-        os.chmod(WORKING_COOKIE_FILE, 0o600)
-        cookie_file = WORKING_COOKIE_FILE
+    # Retrieve cookies using the cross-platform helper
+    cookie_file = _get_cookie_file()
+    if not cookie_file:
+        logger.warning("No YouTube cookies found. Bot detection is highly likely.")
     
     ydl_opts = {
         "outtmpl": output_template,
@@ -307,23 +300,12 @@ def download_video_from_url(url, output_dir, job_id, progress_callback=None):
     }
 
 def prepare_cookies():
-    RENDER_COOKIE_FILE = "/etc/secrets/cookies.txt"
-    WORKING_COOKIE_FILE = "/tmp/cookies.txt"
-    
-    if not os.path.exists(RENDER_COOKIE_FILE):
+    cookie_file = _get_cookie_file()
+    if not cookie_file:
         raise RuntimeError(
-            "YouTube cookie file not found at "
-            + RENDER_COOKIE_FILE
+            "YouTube cookie file not found. Set YOUTUBE_COOKIES_TEXT or use a cookies.txt file."
         )
-
-    shutil.copyfile(
-        RENDER_COOKIE_FILE,
-        WORKING_COOKIE_FILE
-    )
-
-    os.chmod(WORKING_COOKIE_FILE, 0o600)
-
-    return WORKING_COOKIE_FILE
+    return cookie_file
 
 
 def test_youtube():
