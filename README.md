@@ -1,6 +1,7 @@
 # VidSeek 🎥🔍
 
 VidSeek is an intelligent video processing and learning platform that transcribes videos, generates automated chapters, enables semantic search across timestamps, produces quizzes, and offers interactive lecture study notes.
+<img width="1440" height="900" alt="Screenshot 2026-09-27 at 1 03 02 AM" src="https://github.com/user-attachments/assets/bf752a54-1582-48cd-b16c-5b8f3f858689" />
 
 ## Features
 
